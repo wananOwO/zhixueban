@@ -18,7 +18,9 @@
 - 教材支持格式：EPUB、TXT、PDF、MOBI、AZW3、DOCX、Markdown（MOBI/AZW3 走 calibre 可选依赖，见设计 §5.1）
 - 出题硬约束：题目仅能使用「已解锁知识点」内容可解（设计 §5.3）
 - 提交截止 2026-11-18；Git 提交保持细粒度，每任务至少一个 commit
-- 严禁照搬任何开源项目代码（赛道违规条款）
+- 严禁照搬任何开源项目代码（赛道违规条款）；但允许使用成熟开源组件库并以其为基底二改（见设计 §4.1）
+- UI 组件优先复用开源：shadcn/ui、assistant-ui、TipTap、@xyflow/react、cmdk、react-resizable-panels；不重复造轮子
+- 无障碍：键盘可达、对比度 ≥ WCAG AA、流式区 aria-live、prefers-reduced-motion（见设计 §4.1）
 
 ## Review Focus
 
@@ -346,7 +348,7 @@ test('建库后 11 张表存在且可插入', () => {
 
 - [ ] **Step 1: 写失败测试**：聚合函数对固定 fixture 数据返回正确日期桶与掌握度分档（绿≥0.8/黄0.4-0.8/红<0.4/灰未解锁）
 - [ ] **Step 2: 运行确认失败**
-- [ ] **Step 3: 实现** 聚合 + ECharts 日历热力图 + d3-force 图谱着色 + 课程进度条
+- [ ] **Step 3: 实现** 聚合 + ECharts 日历热力图 + @xyflow/react 知识图谱（节点按掌握度着色，附等价列表视图）+ 课程进度条
 - [ ] **Step 4: 运行确认通过 + 页面手动验证**
 - [ ] **Step 5: Commit** — `feat: 学习可视化`
 

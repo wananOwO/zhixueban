@@ -92,12 +92,39 @@ MCP/工具集成(4%) + 多模态(5%) 共 23%，与本项目功能逐项对应；
 |---|---|---|
 | 框架 | **Next.js 14+（App Router）+ TypeScript** | 赛道推荐首选；API Routes 承担后端接入层，单仓库 |
 | AI 交互 | **Vercel AI SDK** | 流式对话、Tool Calling、生成式 UI，赛道推荐首选 |
-| UI | Tailwind CSS + shadcn/ui + Framer Motion | 赛道推荐组合 |
+| UI | Tailwind CSS + shadcn/ui + Framer Motion（详见 §4.1 前端设计原则） | 赛道推荐组合 |
 | 可视化 | ECharts（热力图/图表）+ 自绘知识图谱（Canvas/d3-force） | 成熟、中文文档好 |
 | 本地存储 | SQLite（better-sqlite3）+ 本地向量库（LanceDB / sqlite-vec，可嵌入 Node 进程，VPS 部署无外部依赖） | 单用户本地优先 |
 | 教材解析 | 见 §5.1 解析管线 | 多格式统一为章节树 |
 | LLM 接入 | 可配置 Provider（DeepSeek / 智谱 / OpenAI 兼容接口），环境变量注入 | 赛道要求 Key 走环境变量；国产 API 有免费额度 |
 | MCP | MCP client 接入搜索/文档类 server | 对应评分项 |
+
+---
+
+## 4.1 前端设计原则（用户明确要求：前端必须好看、符合主题、无障碍到位）
+
+**设计风格**：参考 Vercel Geist 设计体系——克制的高级灰底 + 单一强调色、细边框、大量留白、
+几何无衬线字体（Geist Sans / 中文用系统字体栈）、微动效（Framer Motion，时长 ≤200ms）。
+深浅双主题（next-themes），默认跟随系统。
+
+**不重复造轮子（用户明确原则）**：能用的成熟开源组件直接用，必要时以开源组件为基底二改：
+
+| 场景 | 选型 | 理由 |
+|---|---|---|
+| 基础组件 | shadcn/ui（Radix Primitives） | ARIA 无障碍内置、可复制进仓库自定义 |
+| AI 对话/课件流 | assistant-ui | 专为 Vercel AI SDK 设计的聊天/流式 UI 组件 |
+| 富文本笔记 | TipTap | 成熟编辑器，Markdown 序列化，插件生态 |
+| 知识图谱交互 | React Flow（@xyflow/react） | 节点图交互完善（缩放/拖拽/键盘），胜过自绘 d3 |
+| 命令面板 | cmdk | 全局搜索/跳转 |
+| 布局 | react-resizable-panels | 可拖拽分栏 |
+| 图表/热力图 | ECharts | 日历热力图内置 |
+
+**无障碍硬性要求**（评审演示也会体现）：
+1. 全站键盘可达，焦点环可见；所有交互元素有 aria-label
+2. 文字对比度 ≥ WCAG AA（4.5:1）
+3. 流式输出区域用 `aria-live="polite"`，屏幕阅读器可感知生成进度
+4. 尊重 `prefers-reduced-motion`，开启时禁用非必要动效
+5. 知识图谱等图形区域提供等价的列表/文本视图
 
 ---
 
