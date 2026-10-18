@@ -23,7 +23,7 @@ export async function buildQuestionCorpus(input: {
 
 export interface GenerateQuestionsInput {
   courseId: string;
-  scope: 'knowledgePoint' | 'chapter' | 'course';
+  scope: 'knowledgePoint' | 'chapter' | 'course' | 'diagnostic' | 'final';
   scopeId: string;
   count: number;
   difficulty: 'easy' | 'medium' | 'hard';

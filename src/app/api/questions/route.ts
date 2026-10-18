@@ -19,7 +19,7 @@ function getUnlocked(textbookId: string): { kpIds: string[]; chapterIds: string[
 export async function POST(req: Request): Promise<Response> {
   const body = (await req.json().catch(() => null)) as {
     courseId?: string;
-    scope?: 'knowledgePoint' | 'chapter' | 'course';
+    scope?: 'knowledgePoint' | 'chapter' | 'course' | 'diagnostic' | 'final';
     scopeId?: string;
     count?: number;
     difficulty?: 'easy' | 'medium' | 'hard';
