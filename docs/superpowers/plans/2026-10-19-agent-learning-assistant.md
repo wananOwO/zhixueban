@@ -15,6 +15,7 @@
 - Node ≥ 20，包管理器 pnpm，TypeScript `strict: true`
 - LLM/Embedding 的 API Key、baseURL 全部走环境变量（`.env.local` 模板入库，真实值不入库）
 - 所有 LLM 调用必须经 `src/lib/llm/provider.ts` 的 `getModel()` / `getEmbeddingModel()`，禁止散落直连
+- **结构化生成一律用工具调用（tool calling）规范**：模型必须调用注册类工具（如 `register_knowledge_point`、`submit_question`）提交格式化内容，不用裸提示词约束的 `generateObject`——指令遵守差的模型也会被工具 schema 强制约束
 - 教材支持格式：EPUB、TXT、PDF、MOBI、AZW3、DOCX、Markdown（MOBI/AZW3 走 calibre 可选依赖，见设计 §5.1）
 - 出题硬约束：题目仅能使用「已解锁知识点」内容可解（设计 §5.3）
 - 提交截止 2026-11-18；Git 提交保持细粒度，每任务至少一个 commit
