@@ -17,6 +17,12 @@ export function getDb(dbPath?: string): Database.Database {
   const db = new Database(target);
   db.pragma('journal_mode = WAL');
   db.exec(SCHEMA_SQL);
+  // 增量迁移：旧库补列（列已存在时忽略错误）
+  try {
+    db.exec('ALTER TABLE knowledge_points ADD COLUMN last_updated TEXT');
+  } catch {
+    /* 列已存在 */
+  }
 
   instance = db;
   instancePath = target;
