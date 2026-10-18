@@ -10,6 +10,14 @@ import { upsertChunks } from '@/lib/rag/store';
 
 export const runtime = 'nodejs';
 
+export async function GET(): Promise<Response> {
+  const db = getDb();
+  const textbooks = db
+    .prepare('SELECT id, title, format, created_at AS createdAt FROM textbooks ORDER BY created_at DESC')
+    .all();
+  return Response.json({ textbooks });
+}
+
 const ALLOWED_EXT = new Set(['.txt', '.md', '.markdown', '.epub', '.pdf', '.docx', '.mobi', '.azw3']);
 
 export async function POST(req: Request): Promise<Response> {

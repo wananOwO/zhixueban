@@ -14,6 +14,14 @@ export interface ComposedCourse {
   id: string;
   outline: OutlineNode[];
   gaps: string[];
+  review: { kept: string[]; excluded: string[]; reorderReason: string; supplements: string[] };
+}
+
+export interface QuizConfig {
+  perKnowledgePoint?: number; // 每知识点题数，默认 3
+  perChapter?: number; // 章测题数，默认 10
+  finalCount?: number; // 综合大题数，默认 10
+  passThreshold?: number; // 边学边练达标阈值 0-1，默认 0（做完即解锁）
 }
 
 export interface ComposeCourseInput {
@@ -22,6 +30,7 @@ export interface ComposeCourseInput {
   goalPrompt: string;
   subjectType: string;
   mode: 1 | 2 | 3;
+  quizConfig?: QuizConfig;
 }
 
 /** 全图拓扑排序后过滤到大纲内节点：跨越被排除节点的传递依赖也能保持先后 */
@@ -65,6 +74,7 @@ export async function composeCourse(input: ComposeCourseInput): Promise<Composed
 
   let outline: OutlineNode[] = [];
   let gaps: string[] = [];
+  let review = { kept: [] as string[], excluded: [] as string[], reorderReason: '', supplements: [] as string[] };
 
   const tools = {
     submitCourseOutline: tool({
@@ -85,6 +95,12 @@ export async function composeCourse(input: ComposeCourseInput): Promise<Composed
       execute: async (result) => {
         outline = result.nodes;
         gaps = result.gaps;
+        review = {
+          kept: result.kept,
+          excluded: result.excluded,
+          reorderReason: result.reorderReason,
+          supplements: result.supplements,
+        };
         return { ok: true };
       },
     }),
@@ -142,9 +158,9 @@ ${edgeList || '（无）'}
     input.goalPrompt,
     input.subjectType,
     input.mode,
-    JSON.stringify({ version: 1, nodes: sorted, gaps }),
+    JSON.stringify({ version: 1, nodes: sorted, gaps, quizConfig: input.quizConfig ?? {}, review }),
     new Date().toISOString(),
   );
 
-  return { id: courseId, outline: sorted, gaps };
+  return { id: courseId, outline: sorted, gaps, review };
 }
