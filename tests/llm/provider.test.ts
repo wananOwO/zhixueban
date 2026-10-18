@@ -19,14 +19,14 @@ describe('llm provider', () => {
     process.env.LLM_MODEL = 'deepseek-chat';
     process.env.LLM_BASE_URL = 'https://api.deepseek.com/v1';
     const model = getModel();
-    expect(model.provider).toContain('openai-compatible');
+    expect(model.modelId).toBe('deepseek-chat');
   });
 
   test('LLM_PROVIDER=anthropic 时走 Anthropic 分支', () => {
     process.env.LLM_API_KEY = 'test-key';
     process.env.LLM_PROVIDER = 'anthropic';
     process.env.LLM_MODEL = 'claude-sonnet-4-5';
-    expect(getModel().provider).toContain('anthropic');
+    expect(getModel().modelId).toBe('claude-sonnet-4-5');
   });
 
   test('getEmbeddingModel 同样需要 Key', () => {

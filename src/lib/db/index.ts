@@ -8,7 +8,7 @@ let instancePath: string | null = null;
 
 /** 获取数据库单例。传 ':memory:' 用于测试；默认存 data/app.db */
 export function getDb(dbPath?: string): Database.Database {
-  const target = dbPath ?? path.join(process.cwd(), 'data', 'app.db');
+  const target = dbPath ?? process.env.DB_PATH ?? path.join(process.cwd(), 'data', 'app.db');
   if (instance && instancePath === target) return instance;
 
   if (target !== ':memory:') {

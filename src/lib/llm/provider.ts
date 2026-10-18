@@ -1,6 +1,5 @@
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { createAnthropic } from '@ai-sdk/anthropic';
-import type { EmbeddingModel, LanguageModel } from 'ai';
 
 export class MissingApiKeyError extends Error {
   constructor() {
@@ -22,7 +21,7 @@ const DEFAULT_BASE_URL = 'https://api.deepseek.com/v1';
  * LLM_PROVIDER=anthropic 时走 Anthropic 原生 SDK。
  * 环境变量：LLM_PROVIDER / LLM_MODEL / LLM_BASE_URL / LLM_API_KEY
  */
-export function getModel(): LanguageModel {
+export function getModel() {
   const apiKey = requireEnv('LLM_API_KEY');
   const provider = process.env.LLM_PROVIDER ?? 'openai-compatible';
   const modelId = process.env.LLM_MODEL ?? 'deepseek-chat';
@@ -39,7 +38,7 @@ export function getModel(): LanguageModel {
 }
 
 /** Embedding 模型工厂。环境变量：EMBEDDING_MODEL / EMBEDDING_BASE_URL（默认同 LLM） */
-export function getEmbeddingModel(): EmbeddingModel {
+export function getEmbeddingModel() {
   const apiKey = requireEnv('LLM_API_KEY');
   const compat = createOpenAICompatible({
     name: 'openai-compatible',
