@@ -1,4 +1,5 @@
 import { getDb } from '@/lib/db';
+import { assertDemoWritable, DemoReadOnlyError } from '@/lib/demo';
 
 export const runtime = 'nodejs';
 
@@ -36,6 +37,14 @@ export async function GET(): Promise<Response> {
 }
 
 export async function PUT(req: Request): Promise<Response> {
+  try {
+    assertDemoWritable();
+  } catch (e) {
+    if (e instanceof DemoReadOnlyError) {
+      return Response.json({ error: e.message }, { status: 403 });
+    }
+    throw e;
+  }
   const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
   if (!body) return Response.json({ error: '请求体必须是 JSON' }, { status: 400 });
 

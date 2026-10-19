@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { getDb } from '@/lib/db';
+import { assertDemoWritable, DemoReadOnlyError } from '@/lib/demo';
 
 export const runtime = 'nodejs';
 
@@ -12,6 +13,14 @@ export async function GET(): Promise<Response> {
 }
 
 export async function POST(req: Request): Promise<Response> {
+  try {
+    assertDemoWritable();
+  } catch (e) {
+    if (e instanceof DemoReadOnlyError) {
+      return Response.json({ error: e.message }, { status: 403 });
+    }
+    throw e;
+  }
   const body = (await req.json().catch(() => null)) as {
     name?: string;
     contentMd?: string;
@@ -43,6 +52,14 @@ export async function POST(req: Request): Promise<Response> {
 }
 
 export async function DELETE(req: Request): Promise<Response> {
+  try {
+    assertDemoWritable();
+  } catch (e) {
+    if (e instanceof DemoReadOnlyError) {
+      return Response.json({ error: e.message }, { status: 403 });
+    }
+    throw e;
+  }
   const id = new URL(req.url).searchParams.get('id');
   if (!id) return Response.json({ error: '缺少 id' }, { status: 400 });
   const info = getDb().prepare('DELETE FROM prompt_templates WHERE id = ?').run(id);
