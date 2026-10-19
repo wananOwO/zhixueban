@@ -226,16 +226,18 @@ function deriveNext(version: CourseVersion, session: StudySession, verified: Set
   const allowed = new Set(allowedKnowledgePointIds(session));
   const completed = new Set(session.completedActivityIds);
   const points = version.outline.flatMap(module => module.points);
-  for (const item of schedule(version, session.mode)) {
-    if (completed.has(item.activityId)) {
-      const module = version.outline.find(module => module.moduleId === item.moduleId);
-      const policy = module?.assessment?.progressionPolicy ?? version.assessment.progressionPolicy;
-      const missing = item.knowledgePointIds.filter(id => !verified.has(id));
-      if (item.kind !== 'lesson' && policy === 'mastery' && missing.length) {
-        return { kind: 'blocked', reason: 'MASTERY_REQUIRED', knowledgePointIds: missing };
-      }
-      continue;
+  // A mode switch must not hide outstanding evidence gates from completed quizzes.
+  for (const item of [...schedule(version, 'practice'), ...schedule(version, 'drill')]) {
+    if (!completed.has(item.activityId) || item.kind === 'lesson') continue;
+    const module = version.outline.find(module => module.moduleId === item.moduleId);
+    const policy = module?.assessment?.progressionPolicy ?? version.assessment.progressionPolicy;
+    const missing = item.knowledgePointIds.filter(id => !verified.has(id));
+    if (policy === 'mastery' && missing.length) {
+      return { kind: 'blocked', reason: 'MASTERY_REQUIRED', knowledgePointIds: missing };
     }
+  }
+  for (const item of schedule(version, session.mode)) {
+    if (completed.has(item.activityId)) continue;
     if (item.kind === 'lesson') return { kind: 'activity', activity: item };
     const required = item.kind === 'point_quiz'
       ? unique([...points.find(point => point.knowledgePointId === item.knowledgePointIds[0])!.prerequisiteIds,

@@ -376,6 +376,37 @@ describe('diagnosis and knowledge gates', () => {
 });
 
 describe('trusted evidence and mastery gates', () => {
+  test.each([
+    ['point_quiz', 'practice', 'theory', 2, ['variables'], 'lesson', ['loops']],
+    ['chapter_quiz', 'theory', 'drill', 3, ['variables', 'loops'], 'point_quiz', ['variables']],
+    ['final_quiz', 'drill', 'theory', 3, ['variables', 'loops'], 'lesson', ['variables']],
+  ] as const)('retains completed %s mastery gates across %s -> %s switches',
+    (kind, originalMode, mode, completions, missing, nextKind, nextScope) => {
+      const input = courseInput();
+      input.assessment.progressionPolicy = kind === 'final_quiz' ? 'mastery' : 'completed';
+      input.outline[0].assessment = { progressionPolicy: kind === 'final_quiz' ? 'completed' : 'mastery' };
+      const version = activateCourseVersion(createCourseVersion(input));
+      let session = createStudySession(version, originalMode);
+      if (originalMode === 'drill') session = declare(version, session, ['variables', 'loops']);
+      for (let index = 0; index < completions; index++) session = finish(version, session);
+      const history = session.completedActivityIds.slice();
+      session = transitionSession(version, session, session.revision, { type: 'change_mode', mode });
+      expect(session.mode).toBe(mode);
+      expect(session.completedActivityIds).toEqual(history);
+      const blocked = { kind: 'blocked', reason: 'MASTERY_REQUIRED', knowledgePointIds: [...missing] };
+      expect(nextActivity(version, session)).toEqual(blocked);
+      session = declare(version, session, ['variables', 'loops']);
+      expect(nextActivity(version, session)).toEqual(blocked);
+      const activity = next(version, session, [...missing]);
+      expect(activity).toMatchObject({ kind: nextKind, knowledgePointIds: [...nextScope] });
+      const command = { type: 'start_activity', activityId: activity.activityId };
+      expect(() => transitionSession(version, session, session.revision, command)).toThrow(LearningError);
+      const running = transitionSession(version, session, session.revision, command, missing);
+      expect(running.currentActivity).toEqual(activity);
+      expect(running.revision).toBe(session.revision + 1);
+      expect(running.completedActivityIds).toEqual(history);
+    });
+
   test('completed point quiz blocks advancement until evidence arrives without manufacturing mastery', () => {
     const input = courseInput();
     input.assessment.progressionPolicy = 'mastery';
