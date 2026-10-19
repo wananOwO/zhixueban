@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { LearningError } from '@/lib/verified-learning/contracts';
+import { LearningError, type CourseVersion } from '@/lib/verified-learning/contracts';
 import { activateCourseVersion, createCourseVersion, reviseCourseVersion } from '@/lib/verified-learning/course-version';
 import { courseInput, activeVersion } from './fixtures';
 
@@ -31,6 +31,39 @@ describe('course version snapshots', () => {
     expect(draft.outline[0].points[0].title).toBe('Variables');
     expect(draft.outline[0].points[0].sourceIds).toEqual(['book-a']);
     expect(active.sourceRevisions[0].sourceRevision).toBe('rev-1');
+  });
+
+  describe.each([
+    ['activation', activateCourseVersion],
+    ['revision', (version: CourseVersion) => reviseCourseVersion(version, courseInput())],
+  ] as const)('%s metadata validation', (_operation, consume) => {
+    test.each([
+      ['courseId', ' '],
+      ['courseVersionId', ' '],
+      ['courseId', 7],
+      ['courseVersionId', undefined],
+      ['engine', 'legacy'],
+      ['status', 'published'],
+      ['createdAt', 'not-a-timestamp'],
+      ['createdAt', '2026-02-30T00:00:00.000Z'],
+      ['createdAt', '2026-10-20T00:00:00'],
+      ['createdAt', '2026-10-20T00:00:00+08:00'],
+    ])('rejects invalid %s = %s', (field, value) => {
+      const version = createCourseVersion(courseInput());
+      Object.assign(version, { [field]: value });
+      expect(() => consume(version)).toThrow(LearningError);
+    });
+  });
+
+  test('retains opaque metadata IDs and valid UTC timestamps without normalization', () => {
+    const version = createCourseVersion(courseInput(), ' opaque-course ');
+    version.courseVersionId = ' opaque-version ';
+    version.createdAt = '2024-02-29T12:30:00Z';
+    expect(activateCourseVersion(version)).toMatchObject({
+      courseId: ' opaque-course ', courseVersionId: ' opaque-version ',
+      createdAt: '2024-02-29T12:30:00Z',
+    });
+    expect(reviseCourseVersion(version, courseInput()).courseId).toBe(' opaque-course ');
   });
 
   test('rejects duplicate module, point and source revision IDs at draft creation', () => {

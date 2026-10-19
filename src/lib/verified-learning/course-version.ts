@@ -1,7 +1,24 @@
 import { randomUUID } from 'node:crypto';
+import { z } from 'zod';
 import {
   LearningError, parseCourseInput, type CourseVersion, type CurriculumPointView,
 } from './contracts';
+
+const id = z.string().refine(value => value.trim().length > 0);
+const metadataSchema = z.strictObject({
+  courseId: id,
+  courseVersionId: id,
+  engine: z.literal('verified-v1'),
+  status: z.enum(['draft', 'active', 'archived']),
+  createdAt: z.iso.datetime(),
+});
+
+function parseCourseVersion(version: CourseVersion): CourseVersion {
+  const { courseId, courseVersionId, engine, status, createdAt, ...input } = version;
+  const metadata = metadataSchema.safeParse({ courseId, courseVersionId, engine, status, createdAt });
+  if (!metadata.success) throw new LearningError('INVALID_INPUT', 'Invalid course version metadata');
+  return { ...parseCourseInput(input), ...metadata.data };
+}
 
 export function createCourseVersion(input: unknown, courseId: string = randomUUID()): CourseVersion {
   if (typeof courseId !== 'string' || courseId.trim().length === 0) {
@@ -18,7 +35,7 @@ export function createCourseVersion(input: unknown, courseId: string = randomUUI
 }
 
 export function reviseCourseVersion(previous: CourseVersion, input: unknown): CourseVersion {
-  return createCourseVersion(input, previous.courseId);
+  return createCourseVersion(input, parseCourseVersion(previous).courseId);
 }
 
 function assertAcyclic(points: CurriculumPointView[]): void {
@@ -47,8 +64,7 @@ function assertAcyclic(points: CurriculumPointView[]): void {
 }
 
 export function activateCourseVersion(version: CourseVersion): CourseVersion {
-  const { courseId, courseVersionId, engine, status: _status, createdAt, ...input } = version;
-  const course = parseCourseInput(input);
+  const course = parseCourseVersion(version);
   const points = course.outline.flatMap(module => module.points);
   if (course.outline.length === 0 || course.outline.some(module => module.points.length === 0)) {
     throw new LearningError('VALIDATION_FAILED', 'Course outline is empty');
@@ -71,5 +87,5 @@ export function activateCourseVersion(version: CourseVersion): CourseVersion {
     }
     available.add(point.knowledgePointId);
   }
-  return { ...course, courseId, courseVersionId, engine, status: 'active', createdAt };
+  return { ...course, status: 'active' };
 }
