@@ -23,7 +23,8 @@ CREATE TABLE IF NOT EXISTS knowledge_points (
   title TEXT NOT NULL,
   chapter_ref TEXT NOT NULL,
   mastery_score REAL NOT NULL DEFAULT 0,
-  status TEXT NOT NULL DEFAULT 'locked'
+  status TEXT NOT NULL DEFAULT 'locked',
+  last_updated TEXT
 );
 
 CREATE TABLE IF NOT EXISTS knowledge_edges (

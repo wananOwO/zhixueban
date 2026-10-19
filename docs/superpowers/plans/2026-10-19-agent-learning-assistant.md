@@ -15,6 +15,7 @@
 - Node ≥ 20，包管理器 pnpm，TypeScript `strict: true`
 - LLM/Embedding 的 API Key、baseURL 全部走环境变量（`.env.local` 模板入库，真实值不入库）
 - 所有 LLM 调用必须经 `src/lib/llm/provider.ts` 的 `getModel()` / `getEmbeddingModel()`，禁止散落直连
+- **结构化生成一律用工具调用（tool calling）规范**：模型必须调用注册类工具（如 `register_knowledge_point`、`submit_question`）提交格式化内容，不用裸提示词约束的 `generateObject`——指令遵守差的模型也会被工具 schema 强制约束
 - 教材支持格式：EPUB、TXT、PDF、MOBI、AZW3、DOCX、Markdown（MOBI/AZW3 走 calibre 可选依赖，见设计 §5.1）
 - 出题硬约束：题目仅能使用「已解锁知识点」内容可解（设计 §5.3）
 - 提交截止 2026-11-18；Git 提交保持细粒度，每任务至少一个 commit
@@ -229,9 +230,9 @@ test('建库后 11 张表存在且可插入', () => {
   // 裁剪无关子树、按依赖拓扑重排、标注深浅；落库 courses.outlineJson
   ```
 
-- [ ] **Step 1: 写失败测试**：目标"只学语法和算法"时，mock 裁剪结果不含被排除子树；大纲节点顺序满足前置依赖
+- [ ] **Step 1: 写失败测试**：目标"只学语法和算法"时，mock 裁剪结果不含被排除子树；大纲节点顺序满足前置依赖；**教材缺口**：mock 目标含"算法"但图谱无算法知识点时，输出 `gaps` 字段非空
 - [ ] **Step 2: 运行确认失败**
-- [ ] **Step 3: 实现**：图谱 + 目标 + 学科提示词注入 → `generateObject` 输出大纲；本地拓扑校验兜底重排
+- [ ] **Step 3: 实现**：图谱 + 目标 + 学科提示词注入 → `generateObject` 输出大纲与 gaps；**裁剪以知识点为单位**（被排除章节中首次出现的必要知识点提取保留）；本地拓扑校验兜底重排；确认页数据含 保留/跳过/重排理由/补充 四清单
 - [ ] **Step 4: 运行确认通过**
 - [ ] **Step 5: Commit** — `feat: 目标驱动课程生成`
 
@@ -262,21 +263,22 @@ test('建库后 11 张表存在且可插入', () => {
 - Produces:
   ```ts
   streamLesson(courseId: string, kpId: string): StreamTextResult
-  // 检索教材分块作上下文锚点；输出 MDX（LaTeX/代码块/图片）；
+  // 检索教材分块作上下文锚点；输出 Markdown（不是 MDX——不信任模型生成可执行代码）
+  // 渲染用 react-markdown + 白名单组件（代码高亮/KaTeX/图片/视频卡片）
   // 引用教材处输出 [src:chapterId:index] 标记，前端渲染为可点击来源徽标
   ```
 
 - [ ] **Step 1: 写失败测试**：prompt 组装含检索到的教材片段与学科提示词；`[src:...]` 标记解析函数正确提取引用
 - [ ] **Step 2: 运行确认失败**
-- [ ] **Step 3: 实现** `streamText` + MDX 渲染组件（来源徽标点击跳教材阅读页对应 anchor）
+- [ ] **Step 3: 实现** `streamText` + react-markdown 渲染组件（白名单组件映射，来源徽标点击跳教材阅读页对应 anchor）
 - [ ] **Step 4: 运行确认通过 + 手动看一节流式课件**
 - [ ] **Step 5: Commit** — `feat: 课件流式生成与来源标注`
 
-### Task 12: 出题器（已学可解约束）
+### Task 12: 出题器（生成—校验—发布）
 
 **Files:**
-- Create: `src/lib/agent/question-gen.ts`、`src/app/api/questions/route.ts`
-- Test: `tests/agent/question-gen.test.ts`
+- Create: `src/lib/agent/question-gen.ts`、`src/lib/agent/question-verify.ts`、`src/app/api/questions/route.ts`
+- Test: `tests/agent/question-gen.test.ts`、`tests/agent/question-verify.test.ts`
 
 **Interfaces:**
 - Consumes: `searchChunks`（仅传已解锁知识点语料）
@@ -285,34 +287,41 @@ test('建库后 11 张表存在且可插入', () => {
   generateQuestions(input: { courseId: string; scope: 'knowledgePoint'|'chapter'|'course';
     scopeId: string; count: number; difficulty: 'easy'|'medium'|'hard';
     unlockedKPIds: string[] }): Promise<Question[]>
-  // generateObject 输出 { type: choice|fill|code, stem, options?, answer, explanation, sourceKPIds }
+  // generateObject 输出 { type: choice|fill|code, stem, options?, answer, referenceSolution?,
+  //   testCases?, rubric, sourceKPIds } —— 生成后须过 verifyQuestion 才入库
+  verifyQuestion(q: Question, unlockedKPIds: string[]): Promise<{ ok: boolean; reason?: string }>
+  // 校验：参考解法实际依赖知识 ⊆ unlockedKPIds；答案与解法一致；code 题由执行器跑通才算 ok
   ```
 
-- [ ] **Step 1: 写失败测试**：`unlockedKPIds` 仅 1 个时，注入语料不含未解锁内容（Review Focus #3）；生成 `sourceKPIds` 全部为已解锁子集
+- [ ] **Step 1: 写失败测试**：`unlockedKPIds` 仅 1 个时，注入语料不含未解锁内容（Review Focus #3）；verify 拒绝标为"循环"但解法是递归的题；缺 referenceSolution 的 code 题被拒
 - [ ] **Step 2: 运行确认失败**
-- [ ] **Step 3: 实现**：语料检索限定已解锁知识点；提示词显式约束；生成后校验 `sourceKPIds ⊆ unlockedKPIds`，违反则重生成一次后丢弃该题
+- [ ] **Step 3: 实现**：语料检索限定已解锁知识点；校验器独立调用（不给生成上下文，防串谋）；校验失败重生成一次，仍败则丢弃；合格题落库再发布
 - [ ] **Step 4: 运行确认通过**
-- [ ] **Step 5: Commit** — `feat: 出题器（已学可解约束）`
+- [ ] **Step 5: Commit** — `feat: 出题器（生成—校验—发布）`
 
-### Task 13: 判题器 + 掌握度模型
+### Task 13: 判题器（执行器+LLM 分工）+ 掌握度模型 + 分层提示
 
 **Files:**
-- Create: `src/lib/agent/judge.ts`、`src/lib/agent/mastery.ts`
-- Test: `tests/agent/judge.test.ts`、`tests/agent/mastery.test.ts`
+- Create: `src/lib/agent/judge.ts`、`src/lib/agent/executor.ts`、`src/lib/agent/mastery.ts`
+- Test: `tests/agent/judge.test.ts`、`tests/agent/mastery.test.ts`、`tests/agent/executor.test.ts`
 
 **Interfaces:**
 - Produces:
   ```ts
   judgeAnswer(questionId: string, userAnswer: string): Promise<{ correct: boolean; score: number; feedback: string }>
-  // 客观题本地比对；主观/编程题 LLM 按 answer+评分要点判分（设计 §8.5）
-  updateMastery(kpId: string, correct: boolean): number  // 加权 + 7 天时间衰减；答错知识点状态回退为"薄弱"
+  // choice/fill 本地比对；code 题执行器跑 testCases 判对错，LLM 仅解释错误（设计 §5.8）
+  runCode(lang: 'javascript'|'python', code: string, testCases: TestCase[]): Promise<RunResult>
+  // python 走 Judge0（JUDGE0_URL，VPS Docker 自部署）；javascript 走 node:vm 沙箱
+  getHint(questionId: string, level: 1|2|3|4): Promise<string>  // 概念→思路→步骤→完整解析
+  updateMastery(kpId: string, correct: boolean): number
+  // 答对 m'=1-(1-m)*0.5；答错 m'=m*0.5；乘 exp(-Δdays/30) 衰减；m≥0.8 即 mastered
   ```
 
-- [ ] **Step 1: 写失败测试**：客观题判分；连续答对 3 次掌握度 ≥ 0.8；30 天前记录衰减后 < 当前值；答错回退薄弱
+- [ ] **Step 1: 写失败测试**：客观题判分；初值 0 连对 3 次 = 0.875 ≥ 0.8；30 天前记录衰减后 < 当前值；答错减半且状态回退；JS 沙箱执行断言通过/失败各一例；提示分级返回不同粒度
 - [ ] **Step 2: 运行确认失败**
-- [ ] **Step 3: 实现**：掌握度公式 `m = 0.6*m_old + 0.4*result`，乘以 `exp(-Δdays/30)` 衰减
+- [ ] **Step 3: 实现**：`node:vm` 沙箱（超时 5s、禁 require）；Judge0 客户端（未配置 JUDGE0_URL 时明确提示）；掌握度公式按上；分层提示按等级注入提示词
 - [ ] **Step 4: 运行确认通过**
-- [ ] **Step 5: Commit** — `feat: 判题与掌握度模型`
+- [ ] **Step 5: Commit** — `feat: 判题（执行器+LLM 分工）与掌握度模型`
 
 ### Task 14: 学习页（三模式状态机 + 答题 UI）
 
@@ -326,11 +335,12 @@ test('建库后 11 张表存在且可插入', () => {
   ```ts
   nextStep(courseId: string): LearnStep
   // LearnStep = { kind: 'lesson'|'quiz'|'chapterQuiz'|'finalQuiz'|'done', kpId?, questions? }
-  // 模式1: 全章节 lesson→章末 quiz；模式2: 每 KP lesson+quiz 过关解锁→章末 quiz；
-  // 模式3: 跳过 lesson，逐 KP quiz→综合大题
+  // 状态：locked/unlocked/learned/mastered（设计 §5.3）；模式 2 默认"做完即解锁"，阈值可配置；
+  // switchMode(courseId, mode)：保留全部学习记录，仅重排后续步骤；
+  // 模式 3 无记录用户先走 diagnostic（简短诊断/声明基础）建立出题范围
   ```
 
-- [ ] **Step 1: 写失败测试**：三种模式各推一遍状态机，断言步骤序列符合设计 §5.3；模式 2 未过关不解锁下一 KP
+- [ ] **Step 1: 写失败测试**：三种模式各推一遍状态机，断言步骤序列符合设计 §5.3；模式 2 未做完不解锁下一 KP；switchMode 后答题记录保留；模式 3 无诊断时第一步为 diagnostic
 - [ ] **Step 2: 运行确认失败**
 - [ ] **Step 3: 实现** `learn-flow.ts` 纯函数状态机 + 学习页（左侧大纲树/右侧内容，答题面板流式反馈）
 - [ ] **Step 4: 运行确认通过 + 手动三模式各走一章**
@@ -352,7 +362,7 @@ test('建库后 11 张表存在且可插入', () => {
 - [ ] **Step 4: 运行确认通过 + 页面手动验证**
 - [ ] **Step 5: Commit** — `feat: 学习可视化`
 
-### Task 16: 笔记 + Obsidian 双向同步
+### Task 16: 笔记 + Obsidian 导入导出
 
 **Files:**
 - Create: `src/app/api/notes/route.ts`、`src/lib/obsidian/sync.ts`、`src/components/note-editor.tsx`
@@ -361,16 +371,16 @@ test('建库后 11 张表存在且可插入', () => {
 **Interfaces:**
 - Produces:
   ```ts
-  syncNoteToVault(note: Note, vaultPath: string): SyncResult
-  // 写入 {vaultPath}/智学伴/{教材}/{知识点}.md；冲突留 .conflict 副本（设计 §8.5）
-  // vaultPath 无效/无权限 → SyncResult = { ok: false, degraded: true }，不抛异常（Review Focus #5）
+  importVaultArchive(zip: Buffer): Promise<number>  // 导入 vault zip 入 RAG 补充库，返回文件数
+  exportNoteToMarkdown(note: Note): string  // 导出 .md（下载；本地部署且配置 vault 路径时可写入）
+  // 首版不做实时双向同步（设计 §5.6.1）；路径无效返回 { ok:false, degraded:true }（Review Focus #5）
   ```
 
-- [ ] **Step 1: 写失败测试**：正常写入；mtime 冲突产生 `.conflict`；无效路径返回 degraded 而非 throw
+- [ ] **Step 1: 写失败测试**：zip 导入后分块可检索；导出内容与笔记一致；无效路径返回 degraded 而非 throw
 - [ ] **Step 2: 运行确认失败**
-- [ ] **Step 3: 实现** 同步 + 笔记编辑器（Markdown，挂知识点）+ 设置页 vault 路径配置
+- [ ] **Step 3: 实现** 导入/导出 + 笔记编辑器（TipTap，挂知识点）+ 设置页 vault 配置区
 - [ ] **Step 4: 运行确认通过**
-- [ ] **Step 5: Commit** — `feat: 笔记与 Obsidian 同步`
+- [ ] **Step 5: Commit** — `feat: 笔记与 Obsidian 导入导出`
 
 ### Task 17: MCP 客户端 + 素材收集
 
@@ -379,7 +389,7 @@ test('建库后 11 张表存在且可插入', () => {
 - Test: `tests/mcp/client.test.ts`
 
 **Interfaces:**
-- Consumes: Vercel AI SDK 的 MCP 支持（`experimental_createMCPClient`）
+- Consumes: AI SDK 的 MCP 支持（`@ai-sdk/mcp` 的 `createMCPClient`；首版仅只读工具）
 - Produces:
   ```ts
   getMcpTools(): Promise<ToolSet>  // 读 settings 表中的 server 列表，连接失败单个跳过+提示
@@ -415,7 +425,7 @@ test('建库后 11 张表存在且可插入', () => {
 - Consumes: 全部前置任务
 
 - [ ] **Step 1: README 复现指南**：clone → `.env.local` 模板 → `pnpm install && pnpm dev`，实测计时 ≤ 10 分钟
-- [ ] **Step 2: VPS 部署**：Docker 构建通过，内置一本示例教材（自编写无版权内容），公网可访问
+- [ ] **Step 2: VPS 部署**：Docker 构建通过（含 Judge0 服务），内置一本示例教材（自编写无版权内容），公网可访问；**DEMO_MODE=true 生效**：设置页只读、调用限额、上传限制、会话隔离、数据定时重置（设计 §5.6.2）
 - [ ] **Step 3: 技术文档**：按赛道模板写项目概述/架构/AI 方案（Agent 编排、RAG 策略、出题约束）/创新点，≤30 页
 - [ ] **Step 4: 演示视频脚本**：痛点→导入→目标定制→三模式→可视化→MCP，5-8 分钟分镜
 - [ ] **Step 5: 最终 Commit + 检查 Git 历史细粒度**
