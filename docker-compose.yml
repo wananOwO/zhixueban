@@ -1,0 +1,21 @@
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    env_file: .env.local
+    environment:
+      JUDGE0_URL: http://judge0:2358
+    volumes:
+      - app-data:/app/data
+    depends_on:
+      - judge0
+
+  # 编程题执行器（设计 §5.8；仅需要 Python 判题时启用）
+  judge0:
+    image: judge0/judge0:1.13.1
+    restart: unless-stopped
+    profiles: ["judge0"]
+
+volumes:
+  app-data:
