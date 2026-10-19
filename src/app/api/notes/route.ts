@@ -1,6 +1,7 @@
-import { randomUUID } from 'node:crypto';
+﻿import { randomUUID } from 'node:crypto';
 import { getDb } from '@/lib/db';
 import { exportNoteToMarkdown, exportNoteToVault } from '@/lib/obsidian/sync';
+import { getConfig } from '@/lib/llm/config';
 
 export const runtime = 'nodejs';
 
@@ -30,7 +31,7 @@ export async function POST(req: Request): Promise<Response> {
         headers: { 'content-type': 'text/markdown; charset=utf-8', 'content-disposition': 'attachment; filename="note.md"' },
       });
     }
-    const vaultPath = process.env.OBSIDIAN_VAULT_PATH ?? '';
+    const vaultPath = getConfig('obsidian_vault_path', 'OBSIDIAN_VAULT_PATH') ?? '';
     const result = exportNoteToVault(body.noteId, vaultPath);
     return Response.json(result, { status: result.ok ? 200 : 422 });
   }

@@ -60,23 +60,93 @@ export default function SettingsPage() {
       )}
 
       <section aria-labelledby="llm-h" className="mb-10">
-        <h2 id="llm-h" className="mb-3 text-lg font-semibold">LLM 配置</h2>
-        <p className="mb-3 text-xs text-muted-foreground">
-          通过环境变量 LLM_PROVIDER / LLM_MODEL / LLM_BASE_URL / LLM_API_KEY 配置（见 .env.example）。
-          此处可保存 API Key 备忘（脱敏显示）。
-        </p>
-        <label className="block text-sm">
-          LLM API Key
-          <div className="mt-1 flex gap-2">
+        <h2 id="llm-h" className="mb-3 text-lg font-semibold">大模型（LLM）</h2>
+        <div className="grid gap-3 rounded-md border border-border p-4">
+          <label className="block text-sm">
+            供应商
+            <select
+              defaultValue={typeof settings.llm_provider === 'string' ? settings.llm_provider : 'openai-compatible'}
+              onChange={(e) => void saveSettings({ llm_provider: e.target.value })}
+              className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2"
+            >
+              <option value="openai-compatible">OpenAI 兼容接口（DeepSeek / 智谱 / OpenAI 等）</option>
+              <option value="anthropic">Anthropic Claude</option>
+            </select>
+          </label>
+          <label className="block text-sm">
+            模型
+            <input
+              defaultValue={typeof settings.llm_model === 'string' ? settings.llm_model : ''}
+              placeholder="例：deepseek-chat"
+              onBlur={(e) => e.target.value && saveSettings({ llm_model: e.target.value })}
+              className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2"
+            />
+          </label>
+          <label className="block text-sm">
+            API 地址（Base URL）
+            <input
+              defaultValue={typeof settings.llm_base_url === 'string' ? settings.llm_base_url : ''}
+              placeholder="例：https://api.deepseek.com/v1"
+              onBlur={(e) => e.target.value && saveSettings({ llm_base_url: e.target.value })}
+              className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2"
+            />
+          </label>
+          <label className="block text-sm">
+            API Key
             <input
               type="password"
-              defaultValue={typeof settings.llm_api_key === 'string' ? '' : ''}
               placeholder={typeof settings.llm_api_key === 'string' ? String(settings.llm_api_key) : '未配置'}
               onBlur={(e) => e.target.value && saveSettings({ llm_api_key: e.target.value })}
-              className="flex-1 rounded-md border border-border bg-background px-3 py-2"
+              className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2"
             />
-          </div>
+          </label>
+        </div>
+      </section>
+
+      <section aria-labelledby="emb-h" className="mb-10">
+        <h2 id="emb-h" className="mb-3 text-lg font-semibold">Embedding 模型</h2>
+        <div className="grid gap-3 rounded-md border border-border p-4">
+          <label className="block text-sm">
+            模型
+            <input
+              defaultValue={typeof settings.embedding_model === 'string' ? settings.embedding_model : ''}
+              placeholder="例：text-embedding-3-small"
+              onBlur={(e) => e.target.value && saveSettings({ embedding_model: e.target.value })}
+              className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2"
+            />
+          </label>
+          <label className="block text-sm">
+            API 地址（留空则与大模型一致）
+            <input
+              defaultValue={typeof settings.embedding_base_url === 'string' ? settings.embedding_base_url : ''}
+              onBlur={(e) => e.target.value && saveSettings({ embedding_base_url: e.target.value })}
+              className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2"
+            />
+          </label>
+          <label className="block text-sm">
+            API Key（留空则与大模型一致）
+            <input
+              type="password"
+              placeholder={typeof settings.embedding_api_key === 'string' ? String(settings.embedding_api_key) : '未单独配置'}
+              onBlur={(e) => e.target.value && saveSettings({ embedding_api_key: e.target.value })}
+              className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2"
+            />
+          </label>
+        </div>
+      </section>
+
+      <section aria-labelledby="judge0-h" className="mb-10">
+        <h2 id="judge0-h" className="mb-3 text-lg font-semibold">编程题执行器（Judge0，可选）</h2>
+        <label className="block text-sm">
+          服务地址
+          <input
+            defaultValue={typeof settings.judge0_url === 'string' ? settings.judge0_url : ''}
+            placeholder="例：http://localhost:2358"
+            onBlur={(e) => e.target.value && saveSettings({ judge0_url: e.target.value })}
+            className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2"
+          />
         </label>
+        <p className="mt-1 text-xs text-muted-foreground">不配置则 Python 编程题不可判分（JS 题不受影响）。</p>
       </section>
 
       <section aria-labelledby="mcp-h" className="mb-10">

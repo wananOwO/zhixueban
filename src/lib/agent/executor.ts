@@ -1,4 +1,5 @@
 import vm from 'node:vm';
+import { getConfig } from '@/lib/llm/config';
 
 export interface TestCase {
   name: string;
@@ -44,7 +45,7 @@ async function runJavaScript(code: string, testCases: TestCase[]): Promise<RunRe
 
 /** Python 走 Judge0（VPS 自部署，JUDGE0_URL 环境变量） */
 async function runPython(code: string, testCases: TestCase[]): Promise<RunResult> {
-  const base = process.env.JUDGE0_URL;
+  const base = getConfig('judge0_url', 'JUDGE0_URL');
   if (!base) {
     return {
       ok: false,

@@ -7,7 +7,12 @@ export const runtime = 'nodejs';
 const SENSITIVE_KEYS = new Set(['llm_api_key', 'embedding_api_key']);
 
 const ALLOWED_KEYS = new Set([
+  'llm_provider',
+  'llm_model',
+  'llm_base_url',
   'llm_api_key',
+  'embedding_model',
+  'embedding_base_url',
   'embedding_api_key',
   'mcp_servers',
   'obsidian_vault_path',
