@@ -5,7 +5,8 @@
 - 工作目录：`E:/code/程序设计比赛-verified-learning`
 - 共同起点：`094eda4`；本次已同步主线提交：`4949471`
 - 赛道：10037，AI WEB 网页开发挑战赛
-- 状态：用户已认可设计方向；本书面规格待用户复核，业务实现尚未开始。
+- 状态：用户于 2026-10-20 确认本书面规格；第一阶段进入实施。
+- 第一阶段计划：`docs/superpowers/plans/2026-10-20-verified-learning-core.md`
 - 接口契约：`docs/contracts/verified-learning-v1.md`
 - 分支协作说明：`docs/coordination/verified-learning-branch.md`
 
@@ -301,4 +302,4 @@ Obsidian 链接图仅作为资料关系来源，教学先修图独立维护。
 - 新增表、路由、代码目录和提交边界明确；共同代码仅通过独立兼容补丁调整。
 - 代码实现、公共接口切换和生产部署尚未发生。
 
-方向确认后，先由用户复核本书面规格，再使用 writing-plans 编写第一阶段实施计划。
+书面规格已由用户确认，按第一阶段实施计划逐项开发和验证；后续阶段单独验收。
