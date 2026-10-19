@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { Save } from 'lucide-react';
+import { tiptapJsonToMarkdown } from '@/lib/notes/markdown';
 
 /** 知识点笔记编辑器（TipTap 富文本，Markdown 存储） */
 export default function NoteEditor({ kpId, onSaved }: { kpId: string; onSaved?: () => void }) {
@@ -24,8 +25,7 @@ export default function NoteEditor({ kpId, onSaved }: { kpId: string; onSaved?: 
   async function save() {
     if (!editor || editor.isEmpty) return;
     setSaving(true);
-    // TipTap 输出 HTML；简单序列化为 Markdown 段落文本（首版）
-    const contentMd = editor.getText({ blockSeparator: '\n\n' });
+    const contentMd = tiptapJsonToMarkdown(editor.getJSON() as never);
     await fetch('/api/notes', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },

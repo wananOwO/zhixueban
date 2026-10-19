@@ -29,8 +29,8 @@ describe('parseTextbook 统一入口', () => {
     await expect(parseTextbook(p)).rejects.toThrow(/不支持/);
   });
 
-  test('mobi/azw3 无 calibre 时报中文安装提示', async () => {
+  test('非法 MOBI 文件报中文错误（内置解析，无需 calibre）', async () => {
     const p = tmpFile('t4.mobi', 'fake');
-    await expect(parseTextbook(p)).rejects.toThrow(/calibre/i);
+    await expect(parseTextbook(p)).rejects.toThrow(/MOBI/);
   });
 });
