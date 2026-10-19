@@ -1,8 +1,8 @@
 # Verified Learning 接口契约 v1
 
-- 日期：2026-10-19
-- 状态：提议契约；已核对主线代码，尚未由两条开发线共同采纳。
-- 对齐提交：`4949471`
+- 核验日期：2026-10-20
+- 状态：第一切片已实现本地领域核心、显式存储和兼容测试；其余章节中的 HTTP、来源、证据约定仍为设计目标，未宣称两条开发线共同采纳。
+- 对齐提交：`cd591dc`（已审阅的主线快照；不包含主线未提交改动）
 - 主线：`feat/mvp`
 - 增强分支：`feat/verified-learning`
 - 适用原则：公共接口不破坏、新能力增量提供、调用方通过适配器选择实现。
@@ -71,9 +71,43 @@ interface ChapterTree {
 
 ## 2. 计划与实现的边界
 
-旧计划提及的 composeCourse、generateQuestions、judgeAnswer、nextStep 等，
-在对齐提交中尚无已提交实现；不把它们伪装为已经稳定的公共接口。
-主线引入相关实现后，本分支先检查其实际 DTO，再增加适配器和契约测试。
+在 `cd591dc` 中，主线已经导出 `composeCourse(input)`、
+`generateQuestions(input)`、`judgeAnswer(questionId, userAnswer)`、
+`nextStep(courseId)` 和 `switchMode(courseId, mode)`。
+这些仍属于 `src/lib/agent/` 的旧引擎；本切片未替换或接管这些实现，
+也未将旧评分结果转成增强引擎的掌握证据。后续接入先核对实际 DTO 和语义。
+
+### 第一切片实际导出
+
+实现位于 `src/lib/verified-learning/`，无导入即迁移或默认数据库访问：
+
+| 文件 | 实际导出 |
+|---|---|
+| contracts.ts | `LearningError`、`parseAssessment`、`parseCourseInput`、`toQuestionView`，以及课程/题目/设置类型 |
+| course-version.ts | `createCourseVersion`、`reviseCourseVersion`、`activateCourseVersion` |
+| legacy.ts | `fromLegacyMode`、`toLegacyMode`、`toSourceAnchor`、`toLegacyAnchor`、`importLegacyCourse` |
+| session.ts | `createStudySession`、`allowedKnowledgePointIds`、`nextActivity`、`transitionSession`，以及 `Activity`、`StudySession`、`SessionCommand`、`NextStep` |
+| store.ts | `migrateVerifiedLearning(db): Promise<void>`、`VerifiedLearningStore` |
+
+`VerifiedLearningStore` 接收显式 `Database.Database`，构造函数不迁移。
+方法为 `createVersion(scopeId, input)`、`reviseVersion(scopeId, versionId, input)`、
+`getVersion(scopeId, versionId)`、`activateVersion(scopeId, versionId)`、
+`createSession(scopeId, versionId, mode)`、`getSession(scopeId, sessionId)`、
+`dispatch(scopeId, sessionId, expectedRevision, idempotencyKey, command)`。
+创建/修改课程返回草稿 `CourseVersion`，会话方法返回 `StudySession`。
+实际会话包含 `currentActivity: Activity | null`、完成/放弃活动及知识范围数组；
+第 4 节的 `StudySessionView` 是未来 HTTP 投影，不是此内部类型。
+
+所有 scope/ID 必须为非空白字符串；缺失和跨 scope 记录均报 `NOT_FOUND`。
+scope 是存储隔离键，不是认证；只有未来服务端认证适配器可选择它。
+实际 `LearningError.code` 为 `INVALID_INPUT`、`NOT_FOUND`、
+`VERSION_CONFLICT`、`VALIDATION_FAILED`、`ACTIVITY_IN_PROGRESS`。
+下文其余 HTTP 错误码尚未实现。
+
+课程激活只验证已提交快照的结构、来源 ID 覆盖和先修顺序/环，
+不验证资料内容、引用真实性或教学质量。完成/诊断命令属于受信任后台事实，
+不是公开请求 DTO；题目归属、答案正确性和证据有效性由后续测评服务验证。
+当前存储不接收掌握证据；`mastery` 门槛保持阻塞，不由阅读或完成活动制造掌握。
 
 以下现状需要用测试覆盖，但本轮不修改主线代码：
 
@@ -87,7 +121,7 @@ interface ChapterTree {
 
 ## 3. 新增能力的公共约定
 
-新增路由前缀为 `/api/verified-learning/v1`。
+以下为后续 HTTP 设计，当前没有增强路由或认证实现。规划前缀为 `/api/verified-learning/v1`。
 正常 JSON 响应使用以下信封，主线旧接口不套用它：
 
 ```ts
@@ -275,6 +309,25 @@ interface RetrievalRequest {
 
 ## 7. 增量迁移和数据切换
 
+已实现的四张表为 `vl_schema_migrations`、`vl_course_versions`、
+`vl_study_sessions`、`vl_learning_events`，迁移版本为 1。
+`migrateVerifiedLearning(db)` 先检查迁移版本，拒绝未知较新版本；
+需要迁移的文件库先等待 SQLite 在线备份完成，备份为原库同目录的
+`<database>.vl-v1-<UUID>.bak`，然后在 immediate 事务中执行 DDL 和版本记录。
+内存库不做文件备份；已是版本 1 时不重复备份或 DDL。
+备份失败不执行 DDL；DDL 失败整笔回滚。备份保留供人工恢复，本切片无自动恢复 CLI。
+不修改主线 PRAGMA；复合外键由启用 `foreign_keys` 的连接执行，
+store 本身始终通过 scoped lookup 和事务维护引用范围。
+
+课程修订追加新草稿；激活只改状态、归档同 scope 同课程的旧活动版本，
+不改快照 JSON，不重新激活已归档版本。旧会话继续绑定原版本；
+新会话只接受活动版本。事件包含请求、结果、递增 revision 和 UTC 时间。
+dispatch 在同一 immediate 事务中检查 scope、历史幂等请求、revision，
+调用 reducer，执行带 revision 条件的 UPDATE，并插入事件；任一步失败回滚。
+幂等键按 scope/session 隔离；属性顺序不同但内容相同的 JSON 请求视为同一请求，
+同键变更 command 或 expectedRevision 报 `VERSION_CONFLICT`。
+精确重试返回原结果，即使会话已继续推进。命令只接受 JSON 值，不接受 undefined/函数/循环引用。
+
 增强表使用 vl_ 前缀、事务性迁移和独立版本记录。
 主线原 schema 不删除、不改列名、不自动复制生产数据。
 仅把旧记录导入为新课程草稿；缺少证据的旧掌握分数标记为 legacy，
@@ -287,15 +340,25 @@ interface RetrievalRequest {
 
 ## 8. 兼容门槛
 
-第一阶段实现契约测试，至少锁定：
+第一切片已覆盖：
 
 1. 老教材接口成功和错误响应。
-2. ChapterTree 与 anchor 映射往返。
+2. 旧教材段落 anchor 与来源锚点的映射往返。
 3. 三模式映射、默认题量与非法值处理。
-4. 新表迁移后旧 11 张表仍可按旧字段读写。
+4. 新表迁移后旧 11 张表结构与既有行不变，教材/课程/题目/作答/笔记链继续读写。
 5. 题目学生 DTO 不泄露标准答案和隐藏用例。
-6. 来源范围、会话归属与乐观并发检查。
-7. 旧数据缺失增强字段时可解释的导入状态。
+6. 结构性来源 ID 覆盖、会话 scope/课程版本隔离与乐观并发检查。
+7. 旧数据缺失增强字段时可解释的草稿导入状态，不伪造证据。
+
+存储测试还覆盖真实临时文件备份/重开、备份失败、DDL 回滚、较新版本拒绝、
+双连接陈旧更新、事件插入触发器失败回滚、历史精确重试、键冲突和归档版本保留。
+教材兼容测试直接调用现有 POST，只替换解析/embedding/chunk-store 边界；
+DB 和上传文件真实读写且限定测试临时目录。它锁定响应契约，
+不宣称修复旧上传流程在 embedding 失败后留下教材行的既有行为。
+
+后续第二阶段才接入语义来源/先修验证和课程确认 UI；
+第三阶段增加题目验证、隔离 JudgePort、证据与复习。
+HTTP 认证、jobs、富课件、连接器、评审体验和模型评测另行交付。
 
 公共契约变化先修改本文和相应测试，再增加适配器。
 破坏性变化使用 v2 路由或显式迁移，不在 v1 原地更改语义。
