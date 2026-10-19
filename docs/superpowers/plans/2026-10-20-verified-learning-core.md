@@ -136,8 +136,9 @@ returns a new snapshot with the same version ID; it does not mutate its input.
 Validate unique module, point and source IDs. Activation rejects empty
 outlines, missing coverage, references to absent source revisions, unsupported
 supplemental sources, and any prerequisite that is neither earlier in the
-outline nor in explicitly recorded prior knowledge. This also rejects cycles
-and self-dependencies. Drafts may retain missing coverage and unresolved
+outline nor in explicitly recorded prior knowledge. Explicitly reject cycles
+and self-dependencies even when their IDs appear in prior knowledge; a
+prior-initialized visited Set alone does not prove acyclicity. Drafts may retain missing coverage and unresolved
 prerequisites for correction; malformed structure and duplicate IDs fail early.
 External source authenticity and goal/prerequisite closure belong to phase 2,
 not to this structural validator.
@@ -193,7 +194,7 @@ must have a distinct module ID. Imported points have missing coverage and no
 source IDs, so the draft requires source/prerequisite review before activation.
 Old mastery scores are not imported as verified state.
 
-- [ ] **Step 1: Write failing tests and a shared two-point fixture.**
+- [x] **Step 1: Write failing tests and a shared two-point fixture.**
 
 Fixture `courseInput()` returns a fresh input with textbook book-a, goal
 "Python basics", source book-a/rev-1, module basics and points variables then
@@ -222,8 +223,8 @@ order, prior-knowledge exemption, source gaps, missing source revision,
 supplement settings, nested mutation isolation, legacy defaults/warnings and
 deep student DTO leakage using sentinel answer/reference/hidden-test values.
 
-- [ ] **Step 2: Run `pnpm test tests/verified-learning/contracts.test.ts tests/verified-learning/course-version.test.ts`; confirm missing behavior.**
-- [ ] **Step 3: Implement the interfaces with existing Zod and standard library.**
+- [x] **Step 2: Run `pnpm test tests/verified-learning/contracts.test.ts tests/verified-learning/course-version.test.ts`; confirm missing behavior.**
+- [x] **Step 3: Implement the interfaces with existing Zod and standard library.**
 
 ```ts
 const questionCount = z.number().int().min(1).max(50);
@@ -238,8 +239,8 @@ For activation, walk the stored order with a Set initialized from prior
 knowledge, check every prerequisite before adding the point, and verify
 source IDs against the snapshot's source revision set.
 
-- [ ] **Step 4: Run focused tests and `pnpm test`; verify no old caller changes.**
-- [ ] **Step 5: Commit only this task's files as `feat: add verified learning contracts and course versions`.**
+- [x] **Step 4: Run focused tests and `pnpm test`; verify no old caller changes.**
+- [x] **Step 5: Commit only this task's files as `feat: add verified learning contracts and course versions`.**
 
 ## Task 2: Pure Three-Mode Session State
 
@@ -321,10 +322,13 @@ Schedules:
   diagnostic returns PRIOR_KNOWLEDGE_REQUIRED rather than inserting theory
   or silently treating the learner as ready.
 - For a chapter/final quiz, the allowed union must cover its knowledge scope.
-- Under mastery policy, a completed point quiz without a verified evidence
-  projection returns MASTERY_REQUIRED; theory never converts reading into
-  mastery, and chapter/final completion under mastery must also meet the
-  evidence gate for their scope.
+- Under mastery policy, record valid quiz completion even without verified
+  evidence, then block advancement (including final done) with MASTERY_REQUIRED
+  until the evidence projection covers that quiz's scope. This applies to
+  point, chapter and final quizzes; module policy governs point/chapter gates
+  and course policy governs final gates. Outstanding gates survive mode
+  changes even when the new schedule omits that completed quiz. Reading and
+  declarations never become mastery.
 
 The allowed union contains displayed, declared and diagnosed IDs only.
 Available/unlocked points do not join it. Completing a lesson adds displayed
@@ -345,7 +349,7 @@ unchanged (apart from the accepted event's new revision). Invalid input or a
 stale expectedRevision throws without mutation. Every accepted command
 increments revision once. Unknown fields/types and noninteger revisions fail.
 
-- [ ] **Step 1: Write failing schedule and transition tests.**
+- [x] **Step 1: Write failing schedule and transition tests.**
 
 ```ts
 const version = activeVersion();
@@ -366,8 +370,8 @@ failure; declared versus diagnosed knowledge; unsuccessful/batched diagnosis;
 mastery block/unblock with trusted evidence; course-version mismatch; mutation
 isolation. Assert exact next activities and histories, not only no exceptions.
 
-- [ ] **Step 2: Run `pnpm test tests/verified-learning/session.test.ts`; confirm missing behavior.**
-- [ ] **Step 3: Implement schedule derivation and a validated command reducer.**
+- [x] **Step 2: Run `pnpm test tests/verified-learning/session.test.ts`; confirm missing behavior.**
+- [x] **Step 3: Implement schedule derivation and a validated command reducer.**
 
 ```ts
 const activityId = JSON.stringify([version.courseVersionId, kind, scopeId]);
@@ -384,8 +388,8 @@ if (expectedRevision !== session.revision) {
 Use a straightforward switch for commands, not a new workflow framework.
 Use Task 1 LearningError and parsing conventions; no DB/model imports.
 
-- [ ] **Step 4: Run focused tests, `pnpm test` and `pnpm exec tsc --noEmit --incremental false`.**
-- [ ] **Step 5: Commit as `feat: add versioned three-mode learning state`.**
+- [x] **Step 4: Run focused tests, `pnpm test` and `pnpm exec tsc --noEmit --incremental false`.**
+- [x] **Step 5: Commit as `feat: add versioned three-mode learning state`.**
 
 ## Task 3: Explicit Additive Persistence And Compatibility Gates
 
@@ -472,7 +476,7 @@ or equivalent structural equality so object property order is not meaningful.
 Increment exactly once; wrong scope, rejected commands and stale updates
 persist neither state nor event. Idempotency applies per session, never globally.
 
-- [ ] **Step 1: Write failing in-memory and temporary file tests.**
+- [x] **Step 1: Write failing in-memory and temporary file tests.**
 
 ```ts
 const db = new Database(':memory:');
@@ -507,8 +511,8 @@ keys, missing-file 400, invalid-format 400, MissingApiKeyError 400, parse
 failure 422, and `{ error: string }` shapes. Use a test-owned upload root via
 a scoped cwd mock; never remove workspace data. No new wrapper over old API.
 
-- [ ] **Step 2: Run new tests; confirm failures before implementation.**
-- [ ] **Step 3: Implement explicit migration and scoped store.**
+- [x] **Step 2: Run new tests; confirm failures before implementation.**
+- [x] **Step 3: Implement explicit migration and scoped store.**
 
 ```ts
 const apply = db.transaction(() => {
@@ -528,16 +532,33 @@ const apply = db.transaction(() => {
 Keep SQL/schema near this store instead of introducing a general repository
 framework. Use shared domain constructors/reducer rather than duplicating rules.
 
-- [ ] **Step 4: Run focused tests, all tests, typecheck, production build, and `git diff --check`.**
-- [ ] **Step 5: Update docs with actual exports, baseline, limitations, test evidence and next phase; commit as `feat: persist isolated verified learning sessions`.**
+- [x] **Step 4: Run focused tests, all tests, typecheck, production build, and `git diff --check`.**
+- [x] **Step 5: Update docs with actual exports, baseline, limitations, test evidence and next phase; commit as `feat: persist isolated verified learning sessions`.**
 
 ## Completion Checks
 
-- [ ] Task 1 review: contract and version behavior verified.
-- [ ] Task 2 review: all three mode paths and transition edge cases verified.
-- [ ] Task 3 review: persistence, scope, retry, backup and legacy compatibility verified.
-- [ ] Whole-slice review: compare only this slice against the approved spec, not unrelated inherited mainline behavior.
-- [ ] Record exact test/typecheck/build results. Keep branch/worktree; no mainline merge, push, deployment or background server.
+- [x] Task 1 review: contract and version behavior verified.
+- [x] Task 2 review: all three mode paths and transition edge cases verified.
+- [x] Task 3 review: persistence, scope, retry, backup and legacy compatibility verified.
+- [x] Whole-slice review: compare only this slice against the approved spec, not unrelated inherited mainline behavior.
+- [x] Record exact test/typecheck/build results. Keep branch/worktree; no mainline merge, push, deployment or background server.
+
+## Execution Evidence
+
+Verified on 2026-10-20 at `ec35f5d` by the implementer and independently by
+the controller:
+
+- `pnpm test`: 24 files, 208 tests passed (69 baseline, 139 added).
+- `pnpm exec tsc --noEmit --incremental false`: exit 0.
+- `pnpm build`: exit 0, existing routes only.
+- `git diff --check`: exit 0.
+- Task reviews passed after fixing metadata validation and cross-mode mastery
+  preservation; both fixes have RED/GREEN regression evidence.
+- Independent whole-slice review of `8776841..ec35f5d` found no actionable
+  issues. Cross-module version/history, migration/retry and diagnostic
+  declaration interactions were checked.
+- Existing Vite CommonJS/native-loader and Git line-ending warnings remain.
+- No production migration, browser check, live model call or external deployment.
 
 ## Deferred To Following Slices
 
