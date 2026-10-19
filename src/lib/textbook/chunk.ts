@@ -48,6 +48,7 @@ export function chunkChapterTree(tree: ChapterTree): Chunk[] {
       if (!bufAnchor) {
         bufAnchor = p.anchor;
         bufChapterId = chapter.id;
+        buf = `【${chapter.title}】`; // 分块携带章节标题上下文
       }
       if (buf.length + p.text.length > CHUNK_SIZE) {
         flush();
