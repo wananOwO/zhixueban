@@ -23,6 +23,11 @@ export function getDb(dbPath?: string): Database.Database {
   } catch {
     /* 列已存在 */
   }
+  try {
+    db.exec("ALTER TABLE lessons ADD COLUMN activity_json TEXT NOT NULL DEFAULT '[]'");
+  } catch {
+    /* 列已存在 */
+  }
 
   instance = db;
   instancePath = target;

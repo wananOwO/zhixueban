@@ -5,6 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import { BookMarked } from 'lucide-react';
+import AgentActivity from './agent-activity';
 import 'katex/dist/katex.min.css';
 
 /** [src:ch:idx] → 可点击的来源链接占位（ref:// 协议由 a 渲染器接管） */
@@ -16,6 +17,8 @@ export default function LessonView({ courseId, kpId }: { courseId: string; kpId:
   const [content, setContent] = useState('');
   const [streaming, setStreaming] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activity, setActivity] = useState<{ tool: string; input: string }[]>([]);
+  const [mcpFailures, setMcpFailures] = useState<string[]>([]);
   const started = useRef(false);
 
   useEffect(() => {
@@ -31,6 +34,8 @@ export default function LessonView({ courseId, kpId }: { courseId: string; kpId:
           return;
         }
         const reader = res.body.getReader();
+        const failures = res.headers.get('x-mcp-failures');
+        if (failures) setMcpFailures(decodeURIComponent(failures).split('；'));
         const decoder = new TextDecoder();
         let acc = '';
         for (;;) {
@@ -38,6 +43,12 @@ export default function LessonView({ courseId, kpId }: { courseId: string; kpId:
           if (done) break;
           acc += decoder.decode(value, { stream: true });
           setContent(acc);
+        }
+        // 流结束后取回 Agent 活动记录
+        const record = await fetch(`/api/lessons/${kpId}/record?courseId=${courseId}`);
+        if (record.ok) {
+          const body = await record.json();
+          setActivity(body.activity ?? []);
         }
       } catch {
         setError('网络错误，请重试');
@@ -96,6 +107,7 @@ export default function LessonView({ courseId, kpId }: { courseId: string; kpId:
         {markSourceRefs(content)}
       </ReactMarkdown>
       {streaming && <span aria-hidden className="inline-block h-4 w-2 animate-pulse bg-accent" />}
+      <AgentActivity activities={activity} failures={mcpFailures} />
     </article>
   );
 }

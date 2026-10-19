@@ -1,4 +1,4 @@
-import { embed, streamText } from 'ai';
+import { embed, stepCountIs, streamText } from 'ai';
 import { getDb } from '@/lib/db';
 import { getEmbeddingModel, getModel } from '@/lib/llm/provider';
 import { loadSubjectPrompt } from '@/lib/llm/prompts';
@@ -54,9 +54,10 @@ export interface StreamLessonInput {
   textbookId: string;
   subjectType: string;
   goalPrompt: string;
+  mcpTools?: Record<string, unknown>;
 }
 
-/** 流式生成课件：RAG 检索教材锚点 → streamText */
+/** 流式生成课件：RAG 检索教材锚点 → streamText（可挂 MCP 只读工具） */
 export async function streamLesson(input: StreamLessonInput) {
   const db = getDb();
   const { embedding } = await embed({
@@ -76,5 +77,11 @@ export async function streamLesson(input: StreamLessonInput) {
     })),
   });
 
-  return streamText({ model: getModel(), prompt });
+  return streamText({
+    model: getModel(),
+    prompt,
+    ...(input.mcpTools && Object.keys(input.mcpTools).length > 0
+      ? { tools: input.mcpTools as never, stopWhen: stepCountIs(10) }
+      : {}),
+  });
 }
