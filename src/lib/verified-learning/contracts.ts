@@ -1,7 +1,6 @@
 import { z } from 'zod';
 
 export type LearningMode = 'theory' | 'practice' | 'drill';
-export type LegacyMode = 1 | 2 | 3;
 export type Difficulty = 'easy' | 'medium' | 'hard';
 export type ErrorCode =
   | 'INVALID_INPUT' | 'NOT_FOUND' | 'VERSION_CONFLICT'

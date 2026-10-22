@@ -4,7 +4,7 @@
 
 | 项目 | 值 |
 |---|---|
-| 主线分支 | feat/mvp |
+| 主线分支 | main（接手核验：ac6f0a9；存在未提交修改，本轮未触碰） |
 | 主线目录 | E:/code/程序设计比赛 |
 | 增强分支 | feat/verified-learning |
 | 增强目录 | E:/code/程序设计比赛-verified-learning |
@@ -18,7 +18,10 @@
 
 仓库当前没有配置远程地址。本文描述本机分支协作，不表示已经推送远程。
 桌面 worktree 工具未识别会话绑定的映射路径，因此使用 Git 原生 worktree；
-两个目录已由 git worktree list 验证，主线仍在 feat/mvp。
+两个目录已由 `git worktree list` 再次验证：原目录当前在 `main`，
+增强目录仍在 `feat/verified-learning`。两者共享 Git 提交历史，
+但各自的工作文件、暂存区和运行数据独立；无需在原目录切换分支。
+增强分支最后提交为 `7dc9145`，第一阶段代码和完成记录均已提交。
 
 ## 写入边界
 
@@ -46,7 +49,7 @@ git show feat/verified-learning:docs/contracts/verified-learning-v1.md
 
 每个可交付切片开始前：
 
-1. 在增强 worktree 检查自身状态和 feat/mvp 的最新已提交内容。
+1. 在增强 worktree 检查自身状态和 main 的最新已提交内容。
 2. 工作区干净后，选择明确的主线提交进行合并，不读取半成品替代提交。
 3. 检查教材 API、共享类型、schema、provider 和依赖锁文件的变化。
 4. 更新本文件中的对齐提交和契约差异。
@@ -56,8 +59,8 @@ git show feat/verified-learning:docs/contracts/verified-learning-v1.md
 
 ```text
 git status --short --branch
-git log --oneline HEAD..feat/mvp
-git diff HEAD...feat/mvp -- src/lib/db src/lib/textbook src/lib/rag src/lib/llm src/app/api package.json pnpm-lock.yaml
+git log --oneline HEAD..main
+git diff HEAD...main -- src/lib/db src/lib/textbook src/lib/rag src/lib/llm src/app/api package.json pnpm-lock.yaml
 git merge --no-edit <reviewed-mainline-commit>
 pnpm install --frozen-lockfile
 pnpm test
@@ -109,10 +112,29 @@ scopeId 只是隔离键，不替代认证；未来由服务端认证适配器提
 掌握门槛继续阻塞，不把完成度当作掌握。课程激活只验证结构和 ID，
 没有语义来源核验。旧教材接口仅锁定兼容响应，未顺便改旧失败回滚逻辑。
 
+## 接手复核（2026-10-20 23:00）
+
+- 第一阶段计划及任务 1—3 提交齐全；恢复前工作区干净，无待续写的半成品。
+- 在 `7dc9145` 重新执行：`pnpm test` 24 文件/208 测试通过；
+  `pnpm exec tsc --noEmit --incremental false`、`pnpm build`、`git diff --check` 均退出 0。
+- 本地执行日志仍写“总审查待完成”，但最终计划提交已记录审查通过；
+  已补充接手核验说明，没有把历史审查描述成本轮重新进行的独立审查。
+- 仍保留历史兼容基线 `cd591dc`；本轮没有同步当前 `main` 的代码或修改其未提交文件。
+- 接手时第二阶段尚无实施计划。用户随后确认进入完整第二阶段、仅本机使用、暂不合并主线；已编写
+  `docs/superpowers/plans/2026-10-20-verified-learning-curriculum.md`。用户随后补充“第二轮：补完整学习体验”，
+  要求融合教材库、学习继续/回看、建课草稿与重复创建修复；该计划现标为范围重议、暂停执行。
+  本次只更新计划与恢复文档，未新增业务代码或 Git 提交。
+
 ## 当前后续步骤
 
 第一切片按 `docs/superpowers/plans/2026-10-20-verified-learning-core.md`
-完成复核。第二阶段单独规划来源/先修验证和课程确认 UI；
+完成复核。第二阶段来源/先修验证和课程确认 UI 的实施计划已保存为
+`docs/superpowers/plans/2026-10-20-verified-learning-curriculum.md`（暂停，不直接执行）。
+融合设计见 `docs/superpowers/specs/2026-10-20-complete-learning-experience-design.md`（用户已确认，语言含 Python 3/JavaScript/C）。
+新实施总入口为 `docs/superpowers/plans/2026-10-21-complete-learning-experience.md`。用户后续要求今天后端优先，
+已实现后端并将API/实际限制写入 `docs/verified-learning/frontend-handoff.md` 与 `backend-status.md`；
+前端和真实判题部署后置，未把原18任务全部标完成；
+用户已选择把编程自动判题并入本轮，实际 Linux 隔离环境验收仍待准备；
 第三阶段增加题库验证、隔离 JudgePort、证据和复习。
 认证路由、jobs、富课件、连接器、评审体验和模型评测另行验收。
 不在本切片内将主线 Agent 接口包装成已经实现的增强业务。

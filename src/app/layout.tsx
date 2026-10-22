@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { ThemeProvider } from 'next-themes';
 import './globals.css';
+import Shell from '@/components/verified-learning/shell';
 
 export const metadata: Metadata = {
   title: '智学伴 — 目标驱动的 AI 学习助手',
@@ -18,7 +19,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           >
             跳到主内容
           </a>
-          {children}
+          <Shell>{children}</Shell>
         </ThemeProvider>
       </body>
     </html>

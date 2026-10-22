@@ -1,0 +1,9 @@
+# tsx 使用已下载的平台二进制，不运行 esbuild 的安装脚本。
+allowBuilds:
+  esbuild: false
+  '@google/genai': false
+  protobufjs: false
+minimumReleaseAgeExclude:
+  - '@earendil-works/pi-agent-core@1.4.0'
+  - '@earendil-works/pi-ai@1.4.0'
+  - '@earendil-works/pi-telemetry@1.4.0'
