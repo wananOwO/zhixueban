@@ -114,7 +114,33 @@
     background: var(--color-zhu-tint);
     box-shadow: -0.5rem 0 0 var(--color-zhu-tint), 0.5rem 0 0 var(--color-zhu-tint);
   }
+
+  /* 批改标记落笔：描边从无到有 */
+  .grade-draw {
+    stroke-dasharray: 40;
+    stroke-dashoffset: 40;
+    animation: grade-draw 320ms ease-out forwards;
+  }
+  /* 新增行淡入（执行记录等） */
+  .row-enter {
+    animation: row-enter 220ms ease-out both;
+  }
+  /* 助教流式回答的光标 */
+  .stream-caret {
+    display: inline-block;
+    width: 0.5rem;
+    height: 1.1em;
+    background: var(--color-zhu);
+    vertical-align: -0.2em;
+    margin-left: 0.125rem;
+    animation: caret-blink 1s steps(1) infinite;
+  }
 }
+
+@keyframes grade-draw { to { stroke-dashoffset: 0; } }
+@keyframes row-enter { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+@keyframes caret-blink { 50% { opacity: 0; } }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
 
 /* 尊重减少动效偏好：不放进层，保证覆盖一切动画 */
 @media (prefers-reduced-motion: reduce) {

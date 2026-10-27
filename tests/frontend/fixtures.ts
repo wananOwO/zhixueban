@@ -1,0 +1,21 @@
+/** 真实课程数据（开发库 python算法入门 课程版本）：18 个知识点与先修关系 */
+export const coursePoints = [
+  { id: 'py-hello-print', title: '运行第一个 Python 程序与 print() 输出', role: 'prerequisite', pre: [] },
+  { id: 'py-variables-numbers', title: '变量与数值运算（整数、浮点数）', role: 'prerequisite', pre: ['py-hello-print'] },
+  { id: 'py-input-int', title: '读取输入：input() 与 int() 类型转换', role: 'target', pre: ['py-variables-numbers'] },
+  { id: 'py-if-conditions', title: '条件测试与 if-elif-else 分支', role: 'prerequisite', pre: ['py-variables-numbers'] },
+  { id: 'py-list', title: '列表 list：创建、索引、增删元素', role: 'prerequisite', pre: ['py-variables-numbers'] },
+  { id: 'py-for-range', title: 'for 循环、range() 与切片', role: 'prerequisite', pre: ['py-list'] },
+  { id: 'py-while-break', title: 'while 循环与 break/continue', role: 'prerequisite', pre: ['py-if-conditions'] },
+  { id: 'py-sort', title: '列表排序：sort() 与 sorted()', role: 'prerequisite', pre: ['py-list'] },
+  { id: 'py-dict', title: '字典 dict：键值对的增删改查', role: 'target', pre: ['py-list'] },
+  { id: 'py-function', title: '函数：def、形参实参与 return', role: 'prerequisite', pre: ['py-if-conditions', 'py-list'] },
+  { id: 'algo-complexity', title: '时间复杂度 Time Complexity 入门', role: 'prerequisite', pre: ['py-for-range'] },
+  { id: 'algo-enumerate', title: '枚举 Enumeration', role: 'target', pre: ['py-for-range', 'py-if-conditions', 'algo-complexity'] },
+  { id: 'algo-prefix-sum', title: '一维前缀和 Prefix Sum', role: 'target', pre: ['py-for-range', 'algo-complexity'] },
+  { id: 'algo-binary-search', title: '二分查找 Binary Search', role: 'target', pre: ['py-while-break', 'py-sort', 'algo-complexity'] },
+  { id: 'algo-recursion', title: '递归 Recursion', role: 'prerequisite', pre: ['py-function'] },
+  { id: 'algo-greedy', title: '贪心算法 Greedy', role: 'target', pre: ['py-sort', 'algo-enumerate'] },
+  { id: 'algo-dp-basic', title: '动态规划基础 Dynamic Programming', role: 'target', pre: ['algo-recursion', 'py-list'] },
+  { id: 'algo-bfs', title: '广度优先搜索 BFS', role: 'target', pre: ['py-while-break', 'py-list', 'py-dict', 'py-function'] },
+].map(p => ({ id: p.id, title: p.title, role: p.role as 'target' | 'prerequisite', prerequisiteIds: p.pre }));

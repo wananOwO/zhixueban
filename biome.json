@@ -8,6 +8,7 @@
 			"src/components/**",
 			"src/lib/api/**",
 			"src/lib/stores/**",
+			"src/lib/hooks/**",
 			"src/lib/nav.ts",
 			"src/lib/utils.ts",
 			"src/lib/roadmap.ts",
