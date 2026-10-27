@@ -103,5 +103,6 @@ describe('显式初始化与只读启动检查', () => {
     expect(created.status).toBe(0);
     expect(created.stdout).toContain('版本 5');
     expect(run(['--db', 'data/app.db']).status).toBe(0);
-  });
+  // 四次启动子进程（每次约 1 秒），全量并行跑时会超过默认 5 秒
+  }, 60_000);
 });
