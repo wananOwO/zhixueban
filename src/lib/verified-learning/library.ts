@@ -15,8 +15,11 @@ export interface BookView { bookId: string; title: string; format: string; statu
   revision: number; sourceRevision: string|null; createdAt: string; chapters: { id: string; title: string; characterCount: number }[] }
 const extensions = new Set(['.txt','.md','.markdown','.epub','.pdf','.docx','.mobi','.azw3']);
 function required(value: string) { if (typeof value !== 'string' || !value.trim()) throw new LearningError('INVALID_INPUT','标识不能为空'); }
+/** 上传限制：本地模式 50MiB 不限本数；线上模式由路由传入更严的上限 */
+export interface UploadLimits { maxBytes: number; maxBooks: number | null }
+const DEFAULT_LIMITS: UploadLimits = { maxBytes: 50 * 1024 * 1024, maxBooks: null };
 export class LibraryService {
-  constructor(private readonly db: Database.Database, private readonly root: string) {}
+  constructor(private readonly db: Database.Database, private readonly root: string, private readonly limits: UploadLimits = DEFAULT_LIMITS) {}
   private row(scope: string, id: string): BookRow {
     required(scope); required(id);
     const row = this.db.prepare('SELECT * FROM vl_books WHERE scope_id=? AND book_id=?').get(scope,id) as BookRow|undefined;
@@ -58,11 +61,16 @@ export class LibraryService {
       .run(scope,id,source.sourceRevision,JSON.stringify(source),new Date().toISOString());
   }
   async importFile(scope:string,key:string,file:File):Promise<BookView> {
-    if(file.size>50*1024*1024) throw new AppError('PAYLOAD_TOO_LARGE','教材超过50MiB');
+    if(file.size>this.limits.maxBytes) throw new AppError('PAYLOAD_TOO_LARGE',`教材超过${Math.round(this.limits.maxBytes/1024/1024)}MiB`);
     const ext=path.extname(file.name).toLowerCase();
     if(!extensions.has(ext)||file.size===0) throw new LearningError('INVALID_INPUT','教材格式或内容不合法');
     const bytes=Buffer.from(await file.arrayBuffer());
     const hash=contentHash(bytes);
+    if(this.limits.maxBooks!==null){
+      // 只统计用户上传的教材，Agent 联网补充的公开来源（web: 前缀）不计入
+      const count=(this.db.prepare("SELECT count(*) AS n FROM vl_books WHERE scope_id=? AND file_hash IS NOT NULL AND file_hash<>?").get(scope,hash) as {n:number}).n;
+      if(count>=this.limits.maxBooks) throw new AppError('LIMIT_EXCEEDED',`每个空间最多上传 ${this.limits.maxBooks} 本教材`);
+    }
     const jobs=new JobStore(this.db);
     const job=jobs.create(scope,'import',key,{hash,format:ext});
     if(job.result) return this.get(scope,job.result.id);
