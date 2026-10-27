@@ -42,5 +42,5 @@ export interface LearningModel {
  questions(context:ContentContext,validate?:(question:QuestionCandidate)=>Promise<void>):Promise<QuestionCandidate[]>;
  review(question:QuestionCandidate,context:ContentContext):Promise<ReviewVerdict>;
 }
-export interface DraftView {draftId:string;revision:number;input:DraftInput;state:string;generationJobId:string|null;generatedFromRevision:number|null;versionId:string|null;review:unknown;confirmed:unknown}
+export interface DraftView {draftId:string;revision:number;input:DraftInput;state:string;generationJobId:string|null;generatedFromRevision:number|null;versionId:string|null;review:unknown;confirmed:unknown;updatedAt?:string}
 export type { CitationInput,SourceRef,SourceSnapshot,LearningMode };

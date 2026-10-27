@@ -125,11 +125,11 @@ export class LibraryService {
   }
   inspectDeletion(scope:string,id:string) {
     const row=this.row(scope,id);
-    const blockers:{kind:string;id:string}[]=[];
+    const blockers:{kind:string;id:string;courseId?:string;status?:string}[]=[];
     if(row.status==='processing')blockers.push({kind:'import',id});
-    for(const version of this.db.prepare('SELECT version_id,snapshot_json FROM vl_course_versions WHERE scope_id=?').all(scope) as {version_id:string;snapshot_json:string}[]){
+    for(const version of this.db.prepare('SELECT version_id,course_id,status,snapshot_json FROM vl_course_versions WHERE scope_id=?').all(scope) as {version_id:string;course_id:string;status:string;snapshot_json:string}[]){
       const snapshot=JSON.parse(version.snapshot_json);
-      if(snapshot.textbookId===id||snapshot.sourceRevisions?.some((s:{sourceId:string})=>s.sourceId===id))blockers.push({kind:'course',id:version.version_id});
+      if(snapshot.textbookId===id||snapshot.sourceRevisions?.some((s:{sourceId:string})=>s.sourceId===id))blockers.push({kind:'course',id:version.version_id,courseId:version.course_id,status:version.status});
     }
     if(this.db.prepare("SELECT 1 FROM sqlite_master WHERE name='vl_drafts'").get()) {
       for(const draft of this.db.prepare("SELECT draft_id,input_json FROM vl_drafts WHERE scope_id=? AND state<>'discarded'").all(scope) as {draft_id:string;input_json:string}[]){

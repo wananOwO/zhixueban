@@ -24,11 +24,11 @@ function Marks({ evidence }: { evidence: ('ok' | 'no')[] }) {
 }
 
 function NodeButton({
-  point, evidence, current, lit, mark, onOpen, onFocusChain, onBlurChain, className, style,
+  point, evidence, current, lit, mark, onOpen, onFocusChain, onBlurChain, className, style, clamp = false,
 }: {
   point: RoadmapPoint; evidence: ('ok' | 'no')[]; current: boolean; lit: boolean | null; mark?: PointMark;
   onOpen?: (id: string) => void; onFocusChain?: (id: string) => void; onBlurChain?: () => void;
-  className?: string; style?: React.CSSProperties;
+  className?: string; style?: React.CSSProperties; clamp?: boolean;
 }) {
   const role = roleLabel(point.role, mark);
   const name = `${point.title}，${role}，计入证据 ${evidence.length} 题${current ? '，正在学习' : ''}`;
@@ -57,7 +57,7 @@ function NodeButton({
         className,
       )}
     >
-      <span className={cn('truncate text-[0.84375rem] font-medium', mark === 'excluded' && 'line-through decoration-void')}>{point.title}</span>
+      <span className={cn('text-[0.84375rem] font-medium leading-snug', clamp && 'line-clamp-2', mark === 'excluded' && 'line-through decoration-void')}>{point.title}</span>
       <span className="flex items-center justify-between gap-2 text-xs text-muted">
         <span>{role}</span>
         <Marks evidence={evidence} />
@@ -195,7 +195,7 @@ function RoadmapGrid({
         className="relative grid gap-x-7"
         style={{
           gridTemplateColumns: `repeat(${layout.columns.length}, minmax(9.75rem, 1fr))`,
-          gridTemplateRows: `2rem repeat(${rowsHalf}, 2.25rem)`,
+          gridTemplateRows: `2rem repeat(${rowsHalf}, 2.625rem)`,
         }}
       >
         <svg aria-hidden className="pointer-events-none absolute left-0 top-0 overflow-visible" width={size.width} height={size.height}>
@@ -235,7 +235,8 @@ function RoadmapGrid({
                 onOpen={onOpen}
                 onFocusChain={onFocusChain}
                 onBlurChain={onBlurChain}
-                className="h-[3.75rem] self-center"
+                clamp
+                className="h-[4.75rem] self-center"
                 style={{ gridColumn: index + 1, gridRow: `${start} / span 2` }}
               />
             );

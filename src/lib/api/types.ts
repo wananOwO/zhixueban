@@ -41,7 +41,7 @@ export interface DeletionImpact {
   bookId: string;
   revision: number;
   blocked: boolean;
-  blockers: { kind: string; id: string }[];
+  blockers: { kind: string; id: string; courseId?: string; status?: string }[];
 }
 export type JobStatus = 'queued' | 'running' | 'waiting_user' | 'succeeded' | 'failed' | 'cancelled';
 export interface JobView {
