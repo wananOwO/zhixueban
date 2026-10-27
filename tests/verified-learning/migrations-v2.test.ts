@@ -29,7 +29,7 @@ describe('第二阶段显式迁移', () => {
     const result = store.dispatch('a', session.sessionId, 0, 'once', { type: 'change_mode', mode: 'practice' });
     const oldTables = db.prepare("SELECT name, sql FROM sqlite_master WHERE type='table' ORDER BY name").all();
     await migrateVerifiedLearning(db);
-    expect(db.prepare('SELECT version FROM vl_schema_migrations ORDER BY version').all()).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }]);
+    expect(db.prepare('SELECT version FROM vl_schema_migrations ORDER BY version').all()).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }, { version: 5 }]);
     expect(names(db)).toEqual(expect.arrayContaining(['vl_web_sessions', 'vl_jobs', 'vl_job_events', 'vl_books', 'vl_source_revisions', 'vl_deletions']));
     for (const row of oldTables as { name: string; sql: string }[]) {
       expect(db.prepare('SELECT sql FROM sqlite_master WHERE name=?').get(row.name)).toEqual({ sql: row.sql });
@@ -45,7 +45,7 @@ describe('第二阶段显式迁移', () => {
     expect(names(db)).toEqual([]);
     await migrateVerifiedLearning(db);
     const records = db.prepare('SELECT * FROM vl_schema_migrations ORDER BY version').all();
-    expect(records).toHaveLength(4);
+    expect(records).toHaveLength(5);
     await migrateVerifiedLearning(db);
     expect(db.prepare('SELECT * FROM vl_schema_migrations ORDER BY version').all()).toEqual(records);
   });
@@ -57,7 +57,7 @@ describe('第二阶段显式迁移', () => {
     await migrateVerifiedLearning(db);
     const backups = readdirSync(directory).filter(name => name.endsWith('.bak'));
     expect(backups).toHaveLength(1);
-    expect(backups[0]).toMatch(/^app\.db\.vl-v4-[0-9a-f-]+\.bak$/);
+    expect(backups[0]).toMatch(/^app\.db\.vl-v5-[0-9a-f-]+\.bak$/);
     const backup = openTestDb(path.join(directory, backups[0]));
     expect(names(backup)).not.toContain('vl_jobs');
     expect(backup.prepare('SELECT version FROM vl_schema_migrations').all()).toEqual([{ version: 1 }]);

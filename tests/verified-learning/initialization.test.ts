@@ -35,11 +35,11 @@ describe('显式初始化与只读启动检查', () => {
     const directory = root();
     const filename = path.join(directory, 'data/new.db');
     const result = await initializeVerifiedLearning('data/new.db', true, directory);
-    expect(result).toMatchObject({ schemaVersion: 4, created: true });
+    expect(result).toMatchObject({ schemaVersion: 5, created: true });
     expect(existsSync(filename)).toBe(true);
     const db = ownTestDb(openInitializedDb('data/new.db', directory));
     expect(db.prepare("SELECT name FROM sqlite_master WHERE name='textbooks'").get()).toEqual({ name: 'textbooks' });
-    expect(db.prepare('SELECT version FROM vl_schema_migrations ORDER BY version').all()).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }]);
+    expect(db.prepare('SELECT version FROM vl_schema_migrations ORDER BY version').all()).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }, { version: 5 }]);
     const files = readdirSync(path.join(directory, 'data'));
     expect(await initializeVerifiedLearning('data/new.db', false, directory)).toMatchObject({ created: false });
     expect(readdirSync(path.join(directory, 'data'))).toEqual(files);
@@ -101,7 +101,7 @@ describe('显式初始化与只读启动检查', () => {
     const created = run(['--db', 'data/app.db', '--create']);
     expect(created.stderr).toBe('');
     expect(created.status).toBe(0);
-    expect(created.stdout).toContain('版本 4');
+    expect(created.stdout).toContain('版本 5');
     expect(run(['--db', 'data/app.db']).status).toBe(0);
   });
 });

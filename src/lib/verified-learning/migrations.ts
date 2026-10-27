@@ -4,7 +4,22 @@ import { LearningError } from './contracts';
 
 import { SCHEMA_V3 } from './backend-schema';
 
-export const CURRENT_SCHEMA_VERSION = 4;
+export const CURRENT_SCHEMA_VERSION = 5;
+
+/** v5：线上模式的浏览器空间登记与每日生成计数；本地模式不使用。 */
+const SCHEMA_V5 = `
+CREATE TABLE vl_spaces (
+ space_id TEXT PRIMARY KEY CHECK (length(space_id) = 43),
+ created_at TEXT NOT NULL, last_seen_at TEXT NOT NULL,
+ sample_seeded INTEGER NOT NULL DEFAULT 0 CHECK (sample_seeded IN (0,1))
+);
+CREATE INDEX vl_space_seen ON vl_spaces(last_seen_at);
+CREATE TABLE vl_generation_usage (
+ space_id TEXT NOT NULL, day TEXT NOT NULL,
+ count INTEGER NOT NULL DEFAULT 0 CHECK (typeof(count) = 'integer' AND count >= 0),
+ PRIMARY KEY (space_id, day)
+);
+`;
 
 const SCHEMA_V4 = `
 CREATE TABLE vl_agent_states (
@@ -145,7 +160,7 @@ export async function migrateVerifiedLearning(db: Database.Database): Promise<vo
     // 等待备份期间其他连接可能已经迁移，取得写锁后重新核验。
     const version = getSchemaVersion(db);
     for (let next = version + 1; next <= CURRENT_SCHEMA_VERSION; next++) {
-      db.exec([SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4][next - 1]);
+      db.exec([SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4, SCHEMA_V5][next - 1]);
       db.prepare('INSERT INTO vl_schema_migrations(version, applied_at) VALUES (?, ?)').run(next, new Date().toISOString());
     }
   }).immediate();

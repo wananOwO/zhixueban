@@ -51,7 +51,7 @@ describe('服务端按需连接', () => {
     ownTestDb(services.db);
     expect(services.scopeId).toBe('local-owner');
     expect(services.jobs.list(services.scopeId)).toEqual([]);
-    expect(services.db.prepare('SELECT max(version) AS version FROM vl_schema_migrations').get()).toEqual({ version: 4 });
+    expect(services.db.prepare('SELECT max(version) AS version FROM vl_schema_migrations').get()).toEqual({ version: 5 });
     services.db.close();
     expect(services.db.open).toBe(false);
   });

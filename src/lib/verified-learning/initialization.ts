@@ -64,6 +64,9 @@ export function openInitializedDb(input: unknown, workingRoot = process.cwd()): 
       throw new AppError('NOT_INITIALIZED', '数据库需要显式初始化');
     }
     db.pragma('foreign_keys = ON');
+    // 生成任务在后台写入时，页面仍要读取进度：WAL 允许读写并发，忙等待避免瞬时锁冲突报错
+    db.pragma('journal_mode = WAL');
+    db.pragma('busy_timeout = 5000');
     return db;
   } catch (error) {
     db.close();
