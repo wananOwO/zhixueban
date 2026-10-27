@@ -4,6 +4,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Toaster } from 'sonner';
 import { ApiError } from '@/lib/api/client';
+// 注册 X-VL-Model 请求头来源（线上模式）：必须在任何请求之前加载
+import '@/lib/stores/model-key';
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   const [client] = useState(() => new QueryClient({

@@ -16,6 +16,7 @@ const errors = {
   IN_PROGRESS: [409, '操作正在进行，请稍后读取结果', true],
   PROVIDER_ERROR: [502, '模型服务暂时不可用', true],
   JUDGE_UNAVAILABLE: [502, '判题服务暂时不可用', true],
+  MODEL_KEY_REQUIRED: [400, '需要模型 Key：请在设置中填写后重试', false],
   INTERNAL_ERROR: [500, '操作失败，请稍后重试', false],
 } as const;
 const headers = { 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' };

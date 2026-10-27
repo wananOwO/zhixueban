@@ -5,7 +5,7 @@ import {VerifiedLearningStore} from './store';
 import {nextActivity,allowedKnowledgePointIds,type Activity,type StudySession,transitionSession} from './session';
 import {LibraryService} from './library';
 import {JobStore} from './jobs';
-import {generationError} from './provider-error';
+import {generationError,jobErrorCode} from './provider-error';
 import {requestOnce} from './courses';
 import {parse,questionSchema,verdictSchema,type LearningModel,type DraftInput,type ContentContext,type QuestionCandidate} from './backend-contracts';
 import {checkCitation,contentHash,type CitationInput} from './sources';
@@ -82,7 +82,7 @@ export class StudyService {
   } catch(error) {
    if(jobs.get(scope,jobId).status!=='cancelled') {
     const detail=generationError(error);
-    jobs.finish(scope,jobId,lease,'failed',null,{code:'VALIDATION_FAILED',message:detail.message,retryable:detail.retryable});
+    jobs.finish(scope,jobId,lease,'failed',null,{code:jobErrorCode(error,'VALIDATION_FAILED'),message:detail.message,retryable:detail.retryable});
    }
    throw error;
   } finally {stopHeartbeat();}
