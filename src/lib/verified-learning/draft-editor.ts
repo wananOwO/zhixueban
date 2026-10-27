@@ -1,4 +1,4 @@
-import type { ProgrammingLanguageName } from './client';
+import type { ProgrammingLanguageName } from '@/lib/api/types';
 
 export type PointStatus = 'target' | 'auto' | 'declared' | 'excluded' | 'none';
 interface PlanPoint { id: string; prerequisiteIds: string[] }

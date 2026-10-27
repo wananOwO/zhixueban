@@ -1,25 +1,31 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { learningEntries } from '@/lib/navigation';
+import { navItems } from '@/lib/nav';
+
 function pages(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap(entry => entry.isDirectory()
     ? pages(path.join(dir, entry.name)) : entry.name === 'page.tsx' ? [path.join(dir, entry.name)] : []);
 }
-describe('单一学习工作台', () => {
+// 路由组 (app) 不出现在网址里
+function toRoute(file: string): string {
+  const segments = path.relative('src/app', path.dirname(file)).split(path.sep).filter(s => s && !/^\(.+\)$/.test(s));
+  return '/' + segments.join('/');
+}
+
+describe('朱批本前端路由', () => {
   it('五项主导航与全部静态页面一一对应', () => {
-    const links = learningEntries.map(item => item.href);
-    expect(links).toEqual(['/', '/verified-learning/textbooks', '/verified-learning/courses', '/verified-learning/drafts', '/settings']);
-    const routes = pages('src/app').filter(file => !file.includes('[')).map(file => '/' + path.relative('src/app', path.dirname(file)).replaceAll('\\', '/'));
-    expect(routes.sort()).toEqual([...links].sort());
+    expect(navItems.map(item => item.href)).toEqual(['/', '/library', '/courses', '/drafts', '/settings']);
+    const routes = pages('src/app').filter(file => !file.includes('[')).map(toRoute);
+    expect(routes.sort()).toEqual(['/', '/courses', '/drafts', '/library', '/settings']);
   });
-  it('删除旧页面与专用 API，不保留跳转壳', () => {
-    for (const file of ['courses/page.tsx','courses/new/page.tsx','textbooks/page.tsx','stats/page.tsx','learn/[courseId]/page.tsx','verified-learning/page.tsx','verified-learning/legacy/page.tsx','api/courses/route.ts','api/textbooks/route.ts','api/questions/route.ts','api/attempts/route.ts']) {
-      expect(existsSync(path.join('src/app', file)), file).toBe(false);
+  it('第一版页面、组件与请求层已删除', () => {
+    for (const file of ['src/app/verified-learning', 'src/components/verified-learning', 'src/lib/navigation.ts', 'src/lib/verified-learning/client.ts']) {
+      expect(existsSync(file), file).toBe(false);
     }
   });
-  it('根布局统一承载导航，各页面不重复挂载 Shell', () => {
-    expect(readFileSync('src/app/layout.tsx', 'utf8')).toContain('<Shell>');
-    for (const file of pages('src/app')) expect(readFileSync(file,'utf8'),file).not.toContain('<Shell>');
+  it('顶栏只在 (app) 布局挂载一次', () => {
+    expect(readFileSync('src/app/(app)/layout.tsx', 'utf8')).toContain('<TopBar');
+    for (const file of pages('src/app')) expect(readFileSync(file, 'utf8'), file).not.toContain('<TopBar');
   });
 });

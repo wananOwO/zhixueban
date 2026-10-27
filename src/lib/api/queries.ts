@@ -1,0 +1,49 @@
+'use client';
+
+import { useQuery } from '@tanstack/react-query';
+import { api, ApiError } from './client';
+import type { ModeView } from './types';
+
+/** TanStack Query 键：同一资源在各页面共用缓存 */
+export const queryKeys = {
+  mode: () => ['mode'] as const,
+  access: () => ['access'] as const,
+  books: (q = '', archived = false) => ['books', q, archived] as const,
+  booksAll: () => ['books'] as const,
+  book: (id: string) => ['book', id] as const,
+  bookUsage: (id: string) => ['book', id, 'usage'] as const,
+  chapter: (bookId: string, chapterId: string, revision: string) => ['chapter', bookId, chapterId, revision] as const,
+  drafts: () => ['drafts'] as const,
+  draft: (id: string) => ['draft', id] as const,
+  templates: () => ['templates'] as const,
+  courses: () => ['courses'] as const,
+  session: (id: string) => ['session', id] as const,
+  run: (id: string) => ['run', id] as const,
+  progress: (versionId: string) => ['progress', versionId] as const,
+  notes: (courseId: string) => ['notes', courseId] as const,
+  jobs: () => ['jobs'] as const,
+  job: (id: string) => ['job', id] as const,
+  trace: (id: string) => ['trace', id] as const,
+  history: (sessionId: string) => ['history', sessionId] as const,
+  historyRun: (sessionId: string, runId: string) => ['history', sessionId, runId] as const,
+  settings: () => ['settings'] as const,
+  judge: () => ['judge'] as const,
+};
+
+const LOCAL_MODE: ModeView = { mode: 'local', uploadLimitBytes: 50 * 1024 * 1024, booksPerSpace: null };
+
+/** 运行模式：旧服务没有 /mode 时按本地模式处理 */
+export function useMode() {
+  return useQuery({
+    queryKey: queryKeys.mode(),
+    staleTime: Infinity,
+    queryFn: async () => {
+      try {
+        return await api<ModeView>('/mode');
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 404) return LOCAL_MODE;
+        throw error;
+      }
+    },
+  });
+}
