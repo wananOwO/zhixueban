@@ -2,6 +2,7 @@ import type Database from 'better-sqlite3';
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { AppError } from './errors';
 import { ONLINE_LIMITS, readMode } from './mode';
+import { seedFromEnv } from './sample-course';
 
 /**
  * 线上模式访问控制（规格 8.4）：
@@ -96,6 +97,8 @@ export function onlineLogin(db: Database.Database, request: Request, secret: unk
     db.prepare('INSERT INTO vl_web_sessions(token_hash,scope_id,expires_at,config_fingerprint) VALUES (?,?,?,?)')
       .run(hash(session).toString('hex'), scopeId, expiresAt, fingerprint(accessCode!));
   }).immediate();
+  // 新空间：种入示例课程（VL_SAMPLE_PATH 未配置时跳过）；失败不影响登录
+  if (!known) seedFromEnv(db, scopeId);
   return {
     scopeId,
     expiresAt,

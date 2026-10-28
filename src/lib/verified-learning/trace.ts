@@ -59,6 +59,10 @@ function errorKind(text: string): string {
   for (const [pattern, label] of ERROR_KINDS) if (pattern.test(text)) return label;
   return '校验未通过，Agent 自动修正';
 }
+/** 工具反馈里决定错误类别的关键词（示例课程导出时用它代替反馈原文，类别判定不变） */
+export function errorSignature(text: string): string {
+  return ERROR_KINDS.flatMap(([pattern]) => pattern.exec(text)?.[0] ?? []).join(' ');
+}
 
 function citesOf(value: unknown): TraceStep['cites'] {
   if (!Array.isArray(value)) return undefined;

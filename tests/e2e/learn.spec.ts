@@ -189,6 +189,23 @@ test.describe('学习页', () => {
     expect(overflow).toBeLessThanOrEqual(0);
   });
 
+  test('线上模式未填 Key：普通活动不能开始；示例课程预先生成的活动可以开始', async ({ page }) => {
+    let prepared = false;
+    const calls = await mockApi(page, {
+      ...common,
+      'GET /mode': () => ({ data: { mode: 'online', uploadLimitBytes: 20 * 1024 * 1024, booksPerSpace: 10 } }),
+      'GET /sessions/s1': () => ({ data: { ...sessionWith(null, { kind: 'activity', activity: quizActivity }), nextPrepared: prepared } }),
+      'POST /sessions/s1/start': () => ({ data: { run: { runId: 'r-quiz', status: 'ready' }, job: null } }),
+    });
+    await page.goto('/learn/s1');
+    await expect(page.getByRole('button', { name: '开始知识点练习' })).toBeDisabled();
+    await expect(page.getByRole('link', { name: '先在设置中填写模型 Key' })).toBeVisible();
+    prepared = true;
+    await page.reload();
+    await page.getByRole('button', { name: '开始知识点练习' }).click();
+    await expect.poll(() => calls.some(c => c.path === '/sessions/s1/start')).toBe(true);
+  });
+
   test('历史回看：时间线 + 只读课件与作答记录（含答案与解析）', async ({ page }) => {
     await mockApi(page, {
       ...common,

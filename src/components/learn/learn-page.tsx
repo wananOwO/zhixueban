@@ -290,7 +290,8 @@ function NextBody({ view, progress, onStarted }: { view: SessionView; progress?:
     mutationFn: () => api(`/sessions/${encodeURIComponent(view.session.sessionId)}/start`, { method: 'POST', body: { expectedRevision: view.session.revision }, key: newKey(), modelHeader: true }),
     onSuccess: onStarted,
   });
-  const needsKey = mode.data?.mode === 'online' && !modelKey;
+  // 示例课程里已预先生成的活动不调用模型，没有 Key 也能开始
+  const needsKey = mode.data?.mode === 'online' && !modelKey && !view.nextPrepared;
   return (
     <div className="mt-6 grid gap-5">
       <NextStep view={view} progress={progress} footer={next.kind !== 'activity'} />

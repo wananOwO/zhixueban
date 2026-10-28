@@ -205,6 +205,8 @@ export interface SessionView {
     outline: { moduleId: string; title: string; points: CoursePointView[] }[];
   };
   next: NextShape;
+  /** 下一活动的内容已预先生成（示例课程）：开始时不调用模型 */
+  nextPrepared?: boolean;
   currentRun: { runId: string; status: string; activity: ActivityShape; jobId: string | null } | null;
   cursor: {
     revision: number;
