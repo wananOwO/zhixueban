@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api/client';
+import { useState } from 'react';
+import { api, newKey } from '@/lib/api/client';
 import { useBooks } from '@/lib/api/hooks';
 import { queryKeys } from '@/lib/api/queries';
 import { draftTitle } from '@/lib/course';
@@ -13,6 +14,8 @@ import { Panel, Pill } from '@/components/ui/panel';
 import { BlockError, BlockLoading } from '@/components/states/block-states';
 import { PageHeader } from '@/components/shell/page-header';
 import { DraftEditor } from './draft-editor';
+import { GenerationView } from './generation-view';
+import { ReviewView } from './review-view';
 
 const DESCRIPTION: Record<string, string> = {
   editing: '写下目标、选好章节，然后生成课程方案。内容自动保存。',
@@ -28,6 +31,14 @@ export function DraftPage({ draftId }: { draftId: string }) {
   const books = useBooks();
   const set = (next: FormDraft) => client.setQueryData(queryKeys.draft(draftId), next);
   const data = draft.data;
+  const [backError, setBackError] = useState<unknown>(null);
+  /** 回到编辑：空保存一次，后端把状态置回 editing（已生成的方案保留，可接受旧结果） */
+  async function backToEdit() {
+    if (!data) return;
+    setBackError(null);
+    try { set(await api<FormDraft>(`/drafts/${data.draftId}`, { method: 'PATCH', body: { expectedRevision: data.revision, input: {} }, key: newKey() })); }
+    catch (error) { setBackError(error); }
+  }
 
   return (
     <>
@@ -41,7 +52,7 @@ export function DraftPage({ draftId }: { draftId: string }) {
           </span>
         )}
       />
-      <BlockError className="mt-4" error={draft.error ?? books.error} onRetry={() => { void draft.refetch(); void books.refetch(); }} />
+      <BlockError className="mt-4" error={draft.error ?? books.error ?? backError} onRetry={() => { void draft.refetch(); void books.refetch(); }} />
       {(draft.isPending || books.isPending) && <Panel className="mt-6"><BlockLoading lines={8} label="正在读取草稿" /></Panel>}
       {data && books.data && data.state === 'editing' && (
         <DraftEditor
@@ -61,12 +72,24 @@ export function DraftPage({ draftId }: { draftId: string }) {
           </div>
         </Panel>
       )}
-      {data && (data.state === 'generating' || data.state === 'review') && <DraftProgress draft={data} onChange={set} onReload={() => void draft.refetch()} />}
+      {data && data.state === 'generating' && data.generationJobId && (
+        <>
+          <GenerationView jobId={data.generationJobId} onFinished={() => void draft.refetch()} />
+          <GenerationFailedActions draft={data} onBack={() => void backToEdit()} />
+        </>
+      )}
+      {data && data.state === 'review' && data.review && <ReviewView key={data.draftId} draft={data} onChange={set} onBackToEdit={() => void backToEdit()} />}
     </>
   );
 }
 
-/** 生成中与审核视图：任务 10 实现 */
-function DraftProgress({ draft }: { draft: FormDraft; onChange: (draft: FormDraft) => void; onReload: () => void }) {
-  return <Panel className="mt-6" title={draft.state === 'generating' ? '正在生成课程方案' : '核对课程方案'}><BlockLoading className="mt-4" lines={4} /></Panel>;
+/** 生成失败或被停止时，草稿仍是 generating：可以返回编辑重新生成 */
+function GenerationFailedActions({ draft, onBack }: { draft: FormDraft; onBack: () => void }) {
+  const job = useQuery({ queryKey: queryKeys.job(draft.generationJobId!), queryFn: () => api<{ status: string }>(`/jobs/${encodeURIComponent(draft.generationJobId!)}`) });
+  if (!job.data || !['failed', 'cancelled'].includes(job.data.status)) return null;
+  return (
+    <div className="mt-4 flex justify-end">
+      <Button onClick={onBack}>返回编辑并重新生成</Button>
+    </div>
+  );
 }

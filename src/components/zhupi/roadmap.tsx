@@ -24,14 +24,14 @@ function Marks({ evidence }: { evidence: ('ok' | 'no')[] }) {
 }
 
 function NodeButton({
-  point, evidence, current, lit, mark, onOpen, onFocusChain, onBlurChain, className, style, clamp = false,
+  point, evidence, current, lit, mark, onOpen, onFocusChain, onBlurChain, className, style, clamp = false, showEvidence = true, currentLabel = '正在学习',
 }: {
   point: RoadmapPoint; evidence: ('ok' | 'no')[]; current: boolean; lit: boolean | null; mark?: PointMark;
   onOpen?: (id: string) => void; onFocusChain?: (id: string) => void; onBlurChain?: () => void;
-  className?: string; style?: React.CSSProperties; clamp?: boolean;
+  className?: string; style?: React.CSSProperties; clamp?: boolean; showEvidence?: boolean; currentLabel?: string;
 }) {
   const role = roleLabel(point.role, mark);
-  const name = `${point.title}，${role}，计入证据 ${evidence.length} 题${current ? '，正在学习' : ''}`;
+  const name = `${point.title}，${role}${showEvidence ? `，计入证据 ${evidence.length} 题` : ''}${current ? `，${currentLabel}` : ''}`;
   return (
     <button
       type="button"
@@ -60,7 +60,7 @@ function NodeButton({
       <span className={cn('text-[0.84375rem] font-medium leading-snug', clamp && 'line-clamp-2', mark === 'excluded' && 'line-through decoration-void')}>{point.title}</span>
       <span className="flex items-center justify-between gap-2 text-xs text-muted">
         <span>{role}</span>
-        <Marks evidence={evidence} />
+        {showEvidence && <Marks evidence={evidence} />}
       </span>
     </button>
   );
@@ -71,7 +71,7 @@ function NodeButton({
  * 悬停或键盘聚焦一个节点时高亮它的整条先修链。手机上（或 compact=true）渲染为按层分组的列表。
  */
 export function Roadmap({
-  points, evidence, current, marks, onOpen, compact = 'auto', className, interactive = true,
+  points, evidence, current, marks, onOpen, compact = 'auto', className, interactive = true, showEvidence = true, currentLabel,
 }: {
   points: RoadmapPoint[];
   evidence: Evidence;
@@ -81,6 +81,10 @@ export function Roadmap({
   compact?: boolean | 'auto';
   className?: string;
   interactive?: boolean;
+  /** 审核方案时还没有作答，不显示证据标记 */
+  showEvidence?: boolean;
+  /** 当前节点的读屏说明，默认「正在学习」 */
+  currentLabel?: string;
 }) {
   const phone = useMediaQuery(PHONE_QUERY);
   const asList = compact === 'auto' ? phone : compact;
@@ -112,6 +116,8 @@ export function Roadmap({
                       onOpen={onOpen}
                       onFocusChain={onFocusChain}
                       onBlurChain={onBlurChain}
+                      showEvidence={showEvidence}
+                      currentLabel={currentLabel}
                       className="min-h-11 w-full"
                     />
                   </li>
@@ -136,13 +142,15 @@ export function Roadmap({
       onFocusChain={onFocusChain}
       onBlurChain={onBlurChain}
       litOf={litOf}
+      showEvidence={showEvidence}
+      currentLabel={currentLabel}
       className={className}
     />
   );
 }
 
 function RoadmapGrid({
-  layout, byId, evidence, current, marks, onOpen, chain, onFocusChain, onBlurChain, litOf, className,
+  layout, byId, evidence, current, marks, onOpen, chain, onFocusChain, onBlurChain, litOf, className, showEvidence, currentLabel,
 }: {
   layout: ReturnType<typeof layoutRoadmap>;
   byId: Map<string, RoadmapPoint>;
@@ -155,6 +163,8 @@ function RoadmapGrid({
   onBlurChain: () => void;
   litOf: (id: string) => boolean | null;
   className?: string;
+  showEvidence: boolean;
+  currentLabel?: string;
 }) {
   const gridRef = useRef<HTMLDivElement>(null);
   const [paths, setPaths] = useState<{ key: string; d: string; from: string; to: string }[]>([]);
@@ -235,6 +245,8 @@ function RoadmapGrid({
                 onOpen={onOpen}
                 onFocusChain={onFocusChain}
                 onBlurChain={onBlurChain}
+                showEvidence={showEvidence}
+                currentLabel={currentLabel}
                 clamp
                 className="h-[4.75rem] self-center"
                 style={{ gridColumn: index + 1, gridRow: `${start} / span 2` }}

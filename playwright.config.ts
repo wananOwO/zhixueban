@@ -22,7 +22,8 @@ export default defineConfig({
   webServer: {
     command: 'node scripts/e2e-server.mjs',
     url: 'http://127.0.0.1:3101/api/verified-learning/v1/mode',
-    reuseExistingServer: true,
-    timeout: 180_000,
+    reuseExistingServer: !process.env.CI,
+    // 包含一次生产构建
+    timeout: 600_000,
   },
 });
