@@ -22,7 +22,7 @@ export function CitationNote({
       className={cn('group block w-full rounded-[var(--radius-control)] text-left text-[0.78125rem] leading-[1.65] transition-colors hover:bg-zhu-tint/60 focus-visible:bg-zhu-tint/60', className)}
     >
       <span className="font-medium text-zhu group-hover:underline group-hover:underline-offset-4">{head}</span>
-      <q className="mt-1 block font-serif text-muted [quotes:'「'_'」']">{quote}</q>
+      <q className="mt-1 block font-serif text-muted [overflow-wrap:anywhere] [quotes:'「'_'」']">{quote}</q>
     </button>
   );
 }

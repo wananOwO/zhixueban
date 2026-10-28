@@ -1,8 +1,11 @@
-import { PageHeader } from '@/components/shell/page-header';
+import { HistoryPage } from '@/components/learn/history-page';
 
-// 占位页：任务 12 替换为正式历史回看
 export const metadata = { title: '历史回看' };
 
-export default function Page() {
-  return <PageHeader title="历史回看" />;
+export default async function Page({ params, searchParams }: {
+  params: Promise<{ sessionId: string }>;
+  searchParams: Promise<{ run?: string }>;
+}) {
+  const [{ sessionId }, query] = await Promise.all([params, searchParams]);
+  return <HistoryPage sessionId={decodeURIComponent(sessionId)} runId={query.run} />;
 }

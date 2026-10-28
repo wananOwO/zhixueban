@@ -1,8 +1,11 @@
-import { PageHeader } from '@/components/shell/page-header';
+import { LearnPage } from '@/components/learn/learn-page';
 
-// 占位页：任务 12 替换为正式学习页
 export const metadata = { title: '学习' };
 
-export default function Page() {
-  return <PageHeader title="学习" />;
+export default async function Page({ params, searchParams }: {
+  params: Promise<{ sessionId: string }>;
+  searchParams: Promise<{ point?: string }>;
+}) {
+  const [{ sessionId }, query] = await Promise.all([params, searchParams]);
+  return <LearnPage sessionId={decodeURIComponent(sessionId)} focusPoint={query.point} />;
 }

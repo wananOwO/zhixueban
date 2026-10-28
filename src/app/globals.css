@@ -43,6 +43,9 @@
   --text-h1: 1.875rem;
   --text-h1--line-height: 1.3;
 
+  /* 学习页三栏的断点（规格 7：≥1440 三栏） */
+  --breakpoint-wide: 90rem;
+
   --radius-paper: 4px;
   --radius-control: 6px;
 
@@ -102,12 +105,17 @@
   .prose-zhupi th { font-weight: 500; color: var(--color-muted); }
   .prose-zhupi blockquote { padding-left: 1rem; box-shadow: inset 2px 0 0 var(--color-control); color: var(--color-ink-soft); }
 
-  /* 被引用的句子：朱批细下划线 */
+  /* 被引用的句子：朱批细下划线（只划那一句，见 rehype-cited） */
   .cited {
     text-decoration: underline;
     text-decoration-color: var(--color-zhu);
     text-decoration-thickness: 1px;
     text-underline-offset: 0.375em;
+  }
+  /* 被引用的代码块与表格：左侧一条朱批细线 */
+  .cited-block > pre,
+  .cited-block > div:has(> table) {
+    box-shadow: inset 2px 0 0 var(--color-zhu);
   }
   /* 原文定位高亮 */
   .target-paragraph {
