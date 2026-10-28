@@ -258,6 +258,7 @@ export interface NoteView {
   knowledgePointId: string;
   revision: number;
   content: string;
+  updatedAt?: string;
 }
 export interface ProgressView {
   courseId: string;
@@ -267,8 +268,10 @@ export interface ProgressView {
   dailyActivity: { date: string; count: number }[];
   verifiedKnowledgePointIds: string[];
   knowledgePoints: { knowledgePointId: string; title: string; verified: boolean }[];
-  /** 每个知识点最近 5 道计入证据的不同题的对错（按时间先后）；任务 11 新增 */
+  /** 每个知识点最近 5 道计入证据的不同题的对错（按时间先后） */
   recent?: Record<string, boolean[]>;
+  /** 计入掌握证据的不同题数（不含看过完整解析的、重做的同一道题） */
+  evidenceQuestions?: number;
 }
 export interface ModeView {
   mode: 'local' | 'online';

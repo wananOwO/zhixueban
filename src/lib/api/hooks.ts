@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { api, newKey } from './client';
 import { queryKeys } from './queries';
-import type { BookView, CourseListItem, DeletionImpact, FormDraft, JobView, ProgressView, SessionView } from './types';
+import type { BookView, CourseListItem, DeletionImpact, FormDraft, HistoryRunDetail, HistoryRunItem, JobView, NoteView, ProgressView, SessionView } from './types';
 
 const RUNNING = new Set(['queued', 'running']);
 export const isRunning = (job: JobView) => RUNNING.has(job.status);
@@ -51,6 +51,31 @@ export function useProgress(versionId: string | undefined) {
     queryKey: queryKeys.progress(versionId ?? ''),
     enabled: !!versionId,
     queryFn: () => api<ProgressView>(`/progress?versionId=${encodeURIComponent(versionId!)}`),
+  });
+}
+
+/** 学习会话的活动历史（只读，不生成内容） */
+export function useHistory(sessionId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.history(sessionId ?? ''),
+    enabled: !!sessionId,
+    queryFn: () => api<HistoryRunItem[]>(`/sessions/${encodeURIComponent(sessionId!)}/history`),
+  });
+}
+
+export function useHistoryRun(sessionId: string | undefined, runId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.historyRun(sessionId ?? '', runId ?? ''),
+    enabled: !!sessionId && !!runId,
+    queryFn: () => api<HistoryRunDetail>(`/sessions/${encodeURIComponent(sessionId!)}/history/${encodeURIComponent(runId!)}`),
+  });
+}
+
+export function useNotes(courseId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.notes(courseId ?? ''),
+    enabled: !!courseId,
+    queryFn: () => api<NoteView[]>(`/notes?courseId=${encodeURIComponent(courseId!)}`),
   });
 }
 

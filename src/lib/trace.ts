@@ -51,6 +51,18 @@ export function summarizeTrace(trace: TraceView | undefined): TraceSummary {
   };
 }
 
+/** 合并多个任务的轨迹（课程主页：方案、课件、题组任务合在一起画书带）；来源按 sourceId 去重 */
+export function mergeTraces(traces: (TraceView | undefined)[]): TraceView {
+  const sources = new Map<string, TraceView['sources'][number]>();
+  const stages: TraceView['stages'] = [];
+  for (const trace of traces) {
+    if (!trace) continue;
+    stages.push(...trace.stages);
+    for (const source of trace.sources) if (!sources.has(source.sourceId)) sources.set(source.sourceId, source);
+  }
+  return { stages, sources: [...sources.values()] };
+}
+
 /** 执行记录一行的说明：在事件标题后补上轨迹里的细节（搜索词、读取范围） */
 export function describeStep(step: TraceStep, titleOf: (sourceId: string) => string): string {
   if (step.read) return `${step.label}：${titleOf(step.read.sourceId)} 第 ${step.read.from}–${step.read.to} 段`;

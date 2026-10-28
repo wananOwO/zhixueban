@@ -28,6 +28,19 @@ export function draftTitle(draft: FormDraft): string {
   return draft.input.title?.trim() || draft.input.goal?.trim() || '未命名草稿';
 }
 
+/**
+ * 还要独立答对几道不同题才算掌握（与后端 verified 同一标准）：
+ * 至少 3 道不同题、最近 5 题答对 80% 以上、最近一题答对。recent 为最近 5 题对错（时间先后）。
+ */
+export function answersNeeded(recent: boolean[]): number {
+  const passes = (list: boolean[]) => {
+    const last = list.slice(-5);
+    return list.length >= 3 && last.filter(Boolean).length / last.length >= 0.8 && list.at(-1) === true;
+  };
+  for (let k = 0; k <= 5; k++) if (passes([...recent, ...Array<boolean>(k).fill(true)])) return k;
+  return 5;
+}
+
 export interface NextStep {
   kind: 'continue' | 'activity' | 'prior' | 'mastery' | 'done';
   title: string;
