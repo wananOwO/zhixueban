@@ -3,6 +3,8 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('server-only', () => ({}));
 vi.mock('next/server', () => ({ after: vi.fn() }));
+// 模型地址的域名解析为公网地址（不走真实 DNS）
+vi.mock('node:dns/promises', () => ({ lookup: async () => [{ address: '8.8.8.8', family: 4 }] }));
 import { POST } from '@/app/api/verified-learning/v1/[[...path]]/route';
 import { initializeVerifiedLearning } from '@/lib/verified-learning/initialization';
 import { resetOnlineLoginLimit } from '@/lib/verified-learning/online-access';

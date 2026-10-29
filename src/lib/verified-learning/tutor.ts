@@ -5,6 +5,7 @@ import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { z } from 'zod';
 import { getModel } from '../llm/provider';
 import { createSourceTools } from './agent/source-tools';
+import { publicOnlyFetch } from './agent/web';
 import { LearningError } from './contracts';
 import { AppError } from './errors';
 import type { LibraryService } from './library';
@@ -124,12 +125,12 @@ export function buildTutorContext(
   return { system: lines.join('\n'), sources };
 }
 
-/** 助教使用的模型：线上模式用浏览器传来的配置；本地模式用设置页 */
+/** 助教使用的模型：线上模式用浏览器传来的配置（请求前校验公网地址、禁止重定向）；本地模式用设置页 */
 export function tutorModel(config?: ModelConfig): LanguageModel {
   if (config) {
     return config.provider === 'anthropic'
-      ? createAnthropic({ apiKey: config.apiKey, baseURL: config.baseUrl })(config.model)
-      : createOpenAICompatible({ name: 'openai-compatible', apiKey: config.apiKey, baseURL: config.baseUrl }).chatModel(config.model);
+      ? createAnthropic({ apiKey: config.apiKey, baseURL: config.baseUrl, fetch: publicOnlyFetch })(config.model)
+      : createOpenAICompatible({ name: 'openai-compatible', apiKey: config.apiKey, baseURL: config.baseUrl, fetch: publicOnlyFetch }).chatModel(config.model);
   }
   try { return getModel(); }
   catch { throw new AppError('MODEL_KEY_REQUIRED', '请先在设置中配置模型 API Key'); }

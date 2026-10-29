@@ -20,6 +20,16 @@ export async function assertPublicUrl(raw: string) {
   return {url,address:addresses[0]};
 }
 
+/**
+ * 线上模式访问模型供应商：每次请求前重新校验地址为公网（DNS 结果可能变化），并禁止跟随重定向，
+ * 防止供应商地址跳转到内网。请求头里带有 Key，重定向也会把 Key 转发给别的主机。
+ */
+export const publicOnlyFetch: typeof fetch = async (input, init) => {
+  const target = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+  await assertPublicUrl(target);
+  return fetch(input, { ...init, redirect: 'error' });
+};
+
 /** DNS校验后固定到已检查地址，重定向逐跳重新校验；不携带供应商凭据。 */
 export async function fetchPublicText(raw: string, signal?: AbortSignal, redirects=0): Promise<{url:string;contentType:string;text:string}> {
   signal?.throwIfAborted();const {url,address}=await assertPublicUrl(raw);

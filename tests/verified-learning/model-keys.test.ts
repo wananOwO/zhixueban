@@ -5,6 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('server-only', () => ({}));
 const callbacks: (() => Promise<void>)[] = [];
 vi.mock('next/server', () => ({ after: (fn: () => Promise<void>) => callbacks.push(fn) }));
+// 线上模式会解析模型地址的域名并拒绝内网：测试里不走真实 DNS，统一解析为公网地址
+vi.mock('node:dns/promises', () => ({ lookup: async () => [{ address: '8.8.8.8', family: 4 }] }));
 import { GET, POST, PATCH } from '@/app/api/verified-learning/v1/[[...path]]/route';
 import { initializeVerifiedLearning } from '@/lib/verified-learning/initialization';
 import { resetOnlineLoginLimit } from '@/lib/verified-learning/online-access';
@@ -89,6 +91,20 @@ describe('线上模式：Key 只在浏览器与服务器内存', () => {
     const response = await POST(request('POST', ['drafts', draft.draftId, 'generate'], { expectedRevision: draft.revision }), context(['drafts', draft.draftId, 'generate']));
     expect(response.status).toBe(400);
     expect((await response.json()).error.code).toBe('MODEL_KEY_REQUIRED');
+  });
+
+  it('模型地址指向内网时拒绝发起生成与拉取模型列表，不建任务、不向该地址发请求', async () => {
+    const draft = await draftReady();
+    const fetchSpy = vi.fn(async () => new Response('{}'));
+    vi.stubGlobal('fetch', fetchSpy);
+    const internal = { 'x-vl-model': encodeModelHeader({ ...config, baseUrl: 'http://169.254.169.254/v1' }) };
+    const generate = await POST(request('POST', ['drafts', draft.draftId, 'generate'], { expectedRevision: draft.revision }, internal), context(['drafts', draft.draftId, 'generate']));
+    expect(generate.status).toBe(400);
+    expect((await generate.json()).error.code).toBe('INVALID_INPUT');
+    const models = await POST(request('POST', ['settings', 'models'], {}, internal), context(['settings', 'models']));
+    expect(models.status).toBe(400);
+    expect(callbacks).toHaveLength(0);
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   it('生成失败时 Key 不落盘：任务、事件、会话记录与数据库文件都不含 Key', async () => {

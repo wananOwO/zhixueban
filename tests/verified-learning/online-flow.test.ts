@@ -4,6 +4,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 vi.mock('server-only', () => ({}));
 const callbacks: (() => Promise<void>)[] = [];
 vi.mock('next/server', () => ({ after: (fn: () => Promise<void>) => callbacks.push(fn) }));
+// 模型地址的域名解析为公网地址（不走真实 DNS）
+vi.mock('node:dns/promises', () => ({ lookup: async () => [{ address: '8.8.8.8', family: 4 }] }));
 import { GET, PATCH, POST } from '@/app/api/verified-learning/v1/[[...path]]/route';
 import { initializeVerifiedLearning } from '@/lib/verified-learning/initialization';
 import { resetOnlineLoginLimit } from '@/lib/verified-learning/online-access';

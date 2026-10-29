@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { publicOnlyFetch } from './agent/web';
 import { parse } from './backend-contracts';
 import { LearningError } from './contracts';
 import { AppError } from './errors';
@@ -19,8 +20,12 @@ function baseAddress(raw: string): string {
 }
 const defaultBase = (provider: string) => provider === 'anthropic' ? 'https://api.anthropic.com/v1' : 'https://api.deepseek.com/v1';
 
-/** 只查询模型元数据，不保存表单、不调用生成；禁止重定向转发密钥。 */
-export async function listModels(input: unknown, saved: Record<string, string | undefined>) {
+/**
+ * 只查询模型元数据，不保存表单、不调用生成；禁止重定向转发密钥。
+ * options.publicOnly：线上模式地址来自浏览器，每次请求前校验为公网。
+ */
+export async function listModels(input: unknown, saved: Record<string, string | undefined>, options: { publicOnly?: boolean } = {}) {
+  const send = options.publicOnly ? publicOnlyFetch : fetch;
   const query = parse(querySchema, input);
   const storedProvider = saved.llm_provider || 'openai-compatible';
   const provider = query.provider ?? storedProvider;
@@ -39,7 +44,7 @@ export async function listModels(input: unknown, saved: Record<string, string | 
     const url = new URL(base + '/models');
     if (provider === 'anthropic') { url.searchParams.set('limit', '1000'); if (after) url.searchParams.set('after_id', after); }
     let response: Response;
-    try { response = await fetch(url, { headers, signal, redirect: 'error', cache: 'no-store' }); }
+    try { response = await send(url, { headers, signal, redirect: 'error', cache: 'no-store' }); }
     catch { throw new ModelListError('PROVIDER_ERROR', '模型列表连接失败或超时，请检查地址后重试'); }
     if (!response.ok) {
       await response.body?.cancel();

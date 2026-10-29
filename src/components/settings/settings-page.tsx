@@ -190,7 +190,7 @@ function ProviderFields({ form, onChange, keyHint, keyPlaceholder, online }: {
             <option value="anthropic">Anthropic Claude</option>
           </Select>
         </Field>
-        <Field label="API 地址" htmlFor="base-url" hint={`留空使用 ${DEFAULT_BASE[form.provider]}`}>
+        <Field label="API 地址" htmlFor="base-url" hint={online ? `只支持公网模型服务（HTTPS 默认端口）；留空使用 ${DEFAULT_BASE[form.provider]}` : `留空使用 ${DEFAULT_BASE[form.provider]}`}>
           <Input id="base-url" aria-describedby="base-url-hint" value={form.baseUrl} maxLength={2000} placeholder={DEFAULT_BASE[form.provider]} onChange={e => { onChange({ baseUrl: e.target.value }); reset(); }} />
         </Field>
       </div>

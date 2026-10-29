@@ -6,6 +6,7 @@ import { getConfig } from '../../llm/config';
 import { AppError } from '../errors';
 import { isOnline } from '../mode';
 import type { ModelConfig } from '../model-keys';
+import { publicOnlyFetch } from './web';
 
 export interface AgentConnection { model: Model<Api>; streamFn: StreamFn }
 
@@ -35,7 +36,9 @@ export function createAgentConnection(config?: ModelConfig): AgentConnection {
   // 内容分节提交；输出截断由 Pi 拒绝执行并要求Agent缩小单次提交，而非发布残缺内容。
   return { model, streamFn: (_model, context, options) => {
     // SDK默认请求计时器会报 Request timed out；设为24小时，实际只服从任务取消信号。
-    const fetchWithoutDeadline: typeof fetch = (url, init) => fetch(url, { ...init, signal: options?.signal });
+    // 线上模式的地址来自浏览器：每次请求前校验为公网并禁止重定向。
+    const send = config ? publicOnlyFetch : fetch;
+    const fetchWithoutDeadline: typeof fetch = (url, init) => send(url, { ...init, signal: options?.signal });
     const requestOptions = { ...options, apiKey, maxRetries: 0, timeoutMs: 24 * 60 * 60 * 1000, fetch: fetchWithoutDeadline };
     return anthropic
       ? streamAnthropic(model as Model<'anthropic-messages'>, context, { ...requestOptions, toolChoice: 'any', maxTokens: 8192 })

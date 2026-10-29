@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { assertPublicUrl } from './agent/web';
 import { LearningError } from './contracts';
 
 /**
@@ -43,6 +44,21 @@ export function parseModelHeader(value: string | null): ModelConfig | null {
   const result = schema.safeParse(parsed);
   if (!result.success) invalid();
   return result.data;
+}
+
+/**
+ * 线上模式：模型地址来自浏览器，服务器会向它发请求。只允许公网 HTTP(S) 默认端口，
+ * 拒绝本机、内网、云服务器元数据等保留地址（与联网补充资料同一套校验）。
+ * 发起任务前先校验一次，给用户明确报错；实际请求由 publicOnlyFetch 再校验。
+ */
+export async function assertPublicModelAddress(config: ModelConfig): Promise<void> {
+  try {
+    await assertPublicUrl(config.baseUrl);
+  } catch (error) {
+    const code = (error as { code?: unknown }).code;
+    if (code === 'ENOTFOUND' || code === 'EAI_AGAIN') throw new LearningError('INVALID_INPUT', '模型地址的域名无法解析，请在设置中检查地址');
+    throw new LearningError('INVALID_INPUT', '线上站只能连接公网模型服务（HTTPS 默认端口），不支持本机、内网或带端口的地址');
+  }
 }
 
 const keys = new Map<string, ModelConfig>();
