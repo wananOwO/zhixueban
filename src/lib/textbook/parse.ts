@@ -42,6 +42,6 @@ export async function parseTextbook(filePath: string): Promise<ChapterTree> {
       return parseDocx(buf, title);
     case 'mobi':
     case 'azw3':
-      return parseMobi(buf, title);
+      return parseMobi(buf, title, format);
   }
 }

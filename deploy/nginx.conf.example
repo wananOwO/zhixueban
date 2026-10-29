@@ -1,0 +1,60 @@
+# Nginx 站点配置样例：/etc/nginx/conf.d/zhixueban.conf
+# 把 learn.example.cn 换成已备案域名；证书路径换成实际签发的证书。
+
+# 访问日志不记录 Cookie 与请求头（默认 combined 格式本就不含，这里显式声明）
+log_format zhixueban '$remote_addr - [$time_local] "$request_method $uri" $status $body_bytes_sent $request_time';
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name learn.example.cn;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name learn.example.cn;
+
+    ssl_certificate     /etc/nginx/certs/learn.example.cn/fullchain.pem;
+    ssl_certificate_key /etc/nginx/certs/learn.example.cn/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_session_cache shared:SSL:10m;
+    add_header Strict-Transport-Security "max-age=31536000" always;
+
+    access_log /var/log/nginx/zhixueban.access.log zhixueban;
+
+    # 上传上限：线上每本 20 MiB，留 1 MiB 给表单开销
+    client_max_body_size 21m;
+
+    location / {
+        proxy_pass http://127.0.0.1:3101;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        # 登录限流按这个头计数：必须由 Nginx 覆盖，不能透传客户端的值
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 120s;
+    }
+
+    # 任务事件流（SSE）与助教流式回答：关闭缓冲，长连接
+    location ~ ^/api/verified-learning/v1/(jobs/[^/]+/stream|sessions/[^/]+/tutor)$ {
+        proxy_pass http://127.0.0.1:3101;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Connection '';
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 1h;
+    }
+
+    # 静态资源：文件名带内容哈希，长期缓存
+    location /_next/static/ {
+        proxy_pass http://127.0.0.1:3101;
+        proxy_set_header Host $host;
+        add_header Cache-Control "public, max-age=31536000, immutable";
+    }
+}

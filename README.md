@@ -1,70 +1,105 @@
-# 智学伴 — 目标驱动的 Agent 个性化学习平台
+# 智学伴：讲解句句有出处的 AI 学习助手
 
-> 2026 第九届传智杯 · AI WEB 网页开发挑战赛参赛作品
+> 2026 第九届传智杯 · AI WEB 网页开发挑战赛参赛作品 · 选手：覃浩东（wananOwO）
 
-导入一本教材，告诉 AI 你想学什么、想怎么学，它为你裁剪课程、逐节讲解、出题考验，直到你真的学会。
+导入一本教材，写下学习目标。Agent 读完教材后排出一条先修路线，再一节节写课件、出题、批改。课件里每一句讲解都标明出自原书第几段，点一下就能对照原文。是否学会，要靠你独立答对不同的题来证明。
 
-## 核心特性
+## 能做什么
 
-- **目标驱动课程重组**：输入学习目标（如"只学语法和算法"）+ 基础描述，Agent 按先修依赖裁剪重排教材知识图谱，生成个性化课程；教材缺口自动检测并明示
-- **三种学习模式**：理论学习 / 边学边练 / 刷题模式，学习中途可切换，记录全保留
-- **生成—校验—发布的出题**：独立校验器核实参考解法的实际知识依赖，编程题经执行器跑通参考解才入库；题目严格限于已学内容
-- **判题分工**：客观题本地比对、编程题执行器（Judge0/node:vm）判对错、LLM 只解释错误并给四级分层提示
-- **教材为中心但不锁死**：RAG 锚点防幻觉，模型可补充教材外内容；引用处标注来源徽标可跳回原文
-- **学科专家提示词**：内置计算机/数学/物理/生物/语言/通用 6 类，支持自定义
-- **MCP 只读工具接入**：Agent 可检索最新技术资料，调用过程可视化
-- **学习画像**：掌握度热力图、知识图谱着色、Obsidian 导入导出
+- **按目标重排教材**：例如目标是「蓝桥杯 Python 组」，Agent 只挑与目标相关的知识点，补齐缺少的先修，画成路线图让你审核。教材里缺的内容会联网找公开资料补充，同样标注来源。
+- **讲解有出处**：课件右侧是朱批旁注，被引用的那一句原文下面画线；点旁注就打开原书并定位到对应段落。
+- **生成过程可回看**：生成时实时显示 Agent 读了哪几段、搜了什么、哪次提交没通过校验又改了；「书带」把读过的段落和最终采用的出处画在全书长度上。
+- **出题先校验**：每道题都经过引用、范围、答案一致性和独立模型审校；编程题的参考解先在隔离的 Judge0 里跑通，才会发给你。
+- **掌握靠证据**：同一个知识点至少答对 3 道不同的题，最近 5 题正确率不低于 80%，且最近一题答对，才算掌握。看过完整解析（第 4 级提示）后的作答不计入。
+- **助教**：针对当前课件提问，回答同样标注出处；你还在做题时，助教不会直接给出答案。
+- **教材格式**：TXT、Markdown、EPUB、PDF（需有文字层）、DOCX、MOBI、AZW3，全部用内置解析，不需要安装 calibre。
+- **笔记**：按知识点记笔记，可导出带 frontmatter 的 Markdown；本地部署时还能直接写入本机的 Obsidian vault。
 
-## 10 分钟极速复现
+## 本地运行（约 10 分钟）
 
-```bash
-# 1. 克隆与安装（需 Node ≥ 22 + pnpm）
-git clone <repo-url> && cd 程序设计比赛
+需要 Node 22 以上和 pnpm，以及一个 OpenAI 兼容接口（DeepSeek、OpenAI、智谱等）或 Anthropic 的 API Key。
+
+```powershell
+# 1. 安装依赖
 pnpm install
 
-# 2. 配置环境变量
-cp .env.example .env.local
-# 编辑 .env.local，填入 LLM_API_KEY（DeepSeek 等 OpenAI 兼容接口即可）
+# 2. 新建本机数据库
+pnpm vl:init --db data/app.db --create
 
-# 3. 启动
-pnpm dev
-# 打开 http://localhost:3000
+# 3. 生成访问口令并启动（只监听 127.0.0.1:3101）
+$env:VERIFIED_LEARNING_LOCAL = '1'
+$env:VERIFIED_LEARNING_ACCESS_TOKEN = node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))"
+$env:DB_PATH = 'data/app.db'
+Write-Output "访问口令：$env:VERIFIED_LEARNING_ACCESS_TOKEN"
+pnpm build
+pnpm start -- --hostname 127.0.0.1 --port 3101
+```
 
-# 4. 跑测试（80+ 用例）
-pnpm test
+打开 http://127.0.0.1:3101 ，输入上面打印的访问口令。进入「设置」填写模型供应商、API Key 和模型名，然后：
+
+1. 在「教材库」上传一本教材。
+2. 在「课程草稿」写下学习目标，选章节，点「生成课程方案」。
+3. 生成完成后审核路线图，确认后开始学习。
+
+Linux 或 macOS 上把第 3 步换成 `export VERIFIED_LEARNING_LOCAL=1` 等写法即可。开发时可以用 `pwsh scripts/dev-local.ps1` 在后台启动 `next dev`，口令写在 `%TEMP%\vl-dev-token.txt`。
+
+**编程题（可选）**：需要 Judge0。Judge0 只能在 Linux 上运行，部署方法见 `deploy/README.md`。设置环境变量 `JUDGE0_URL`（以及 `JUDGE0_TOKEN`）后，设置页会显示可用语言（Python、JavaScript、C）。没有 Judge0 时只是不生成编程题，选择题和填空题不受影响；程序不会在主机上直接执行学生代码。
+
+## 线上部署
+
+同一份代码设置 `VL_MODE=online` 即为公网模式：访问码登录，每个浏览器一个独立空间；评委的模型 Key 只保存在自己的浏览器里，服务器只在内存中使用，任务结束即删除，不写数据库和日志。新空间会自动带上一门示例课程，不填 Key 也能浏览和答题。
+
+Nginx、systemd、Judge0 的配置与运维步骤见 [`deploy/README.md`](deploy/README.md)，示例课程的制作见 [`docs/verified-learning/sample-course.md`](docs/verified-learning/sample-course.md)。
+
+## 测试
+
+```powershell
+pnpm test                                   # 单元与接口测试（Vitest）
+pnpm exec tsc --noEmit --incremental false  # 类型检查
+pnpm lint                                   # Biome
+$env:CI = '1'; pnpm test:e2e                # 端到端与无障碍（Playwright，会先做一次生产构建）
 ```
 
 ## 技术栈
 
-Next.js 16（App Router）· TypeScript · Vercel AI SDK · better-sqlite3 + sqlite-vec ·
-Tailwind CSS v4 · ECharts · React Flow · TipTap · Judge0（可选）
+Next.js 16（App Router）· React 19 · TypeScript · Tailwind CSS 4 · TanStack Query · Vercel AI SDK（流式助教）· pi-agent-core（工具驱动的生成 Agent）· better-sqlite3（WAL）· shiki · CodeMirror · Judge0 · Vitest · Playwright + axe
 
 ## 架构
 
 ```
-教材解析（TXT/MD/EPUB/PDF/DOCX/MOBI）→ 统一章节树 → 分块 + sqlite-vec 向量库
-     ↓
-知识图谱（工具调用注册知识点 + 先修依赖，拒绝成环）
-     ↓
-目标驱动编课（学习约定 → 裁剪/重排/缺口检测 → 四清单确认页）
-     ↓
-流式课件（RAG 锚点 + 学科提示词 + MCP 资料）→ 三模式学习状态机
-     ↓
-出题（生成—校验—发布）→ 判题（执行器为主）→ 掌握度模型 → 学习画像
+上传教材 ─► 解析为章节与段落（每段有稳定段号） ─► 来源快照
+                                                   │
+写下目标 ─► 课程草稿 ─► Agent 生成课程方案 ──────────┤  工具：list/search/read_source、
+                         （读原文、联网补充、          │        search_web、fetch_web_source、
+                          逐个提交并校验知识点）       │        submit_*、finish_generation
+                                 │                    │
+                         审核路线图并确认 ─► 正式课程   │
+                                 │                    │
+            学习会话 ─► Agent 写课件 / 出题（引用校验 + 独立审校 + Judge0 跑参考解）
+                                 │
+               作答 ─► 本地比对 / Judge0 判分 ─► 掌握证据 ─► 下一步
 ```
 
-## 项目结构
+- 所有生成都通过工具调用提交，每次提交先过校验；校验失败时 Agent 收到原因再改，通过了才保存。不解析模型的普通文字回复。
+- 生成任务可断点续跑：已通过验收的知识点、小节、题目不会重复生成。
+- 安全：严格 CSP（nonce）、同源校验、HttpOnly Cookie；联网资料与线上模式的模型地址只允许公网地址，并逐跳校验重定向。
+
+## 目录
 
 ```
-src/lib/textbook/   教材解析与分块
-src/lib/rag/        向量库检索
-src/lib/agent/      知识图谱 / 编课 / 课件 / 出题 / 校验 / 判题 / 掌握度 / 状态机
-src/lib/mcp/        MCP 只读工具客户端
-src/lib/obsidian/   vault 导入导出
-src/app/            页面与 API
-prompts/subjects/   内置学科提示词
+src/app/                         页面与唯一的 API 入口 api/verified-learning/v1
+src/components/                  界面组件（zhupi/ 为朱批、书带、路线图等标志组件）
+src/lib/verified-learning/       后端：教材库、课程、学习、判题、记录、访问控制
+src/lib/verified-learning/agent/ 生成 Agent：工具、会话日志、模型连接
+src/lib/textbook/                教材解析（含纯 JS 的 MOBI/AZW3 解析）
+prompts/subjects/                六类学科提示词
+deploy/                          线上部署配置
+docs/                            设计规格、实施计划、技术文档
+tests/                           Vitest 与 Playwright 测试
 ```
 
-## 参赛信息
+## 文档
 
-选手：覃浩东（wananOwO）· 个人参赛
+- 技术文档：[`docs/技术文档.md`](docs/技术文档.md)
+- 演示视频脚本：[`docs/演示视频脚本.md`](docs/演示视频脚本.md)
+- 接口与前端约定：[`docs/verified-learning/frontend-handoff.md`](docs/verified-learning/frontend-handoff.md)

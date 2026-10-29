@@ -3,3 +3,9 @@ node_modules/
 data/
 *.local
 .superpowers/
+# 运行时与构建产物
+*.log
+*.tsbuildinfo
+test-results/
+playwright-report/
+.unipi/

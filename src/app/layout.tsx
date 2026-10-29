@@ -1,27 +1,26 @@
-import type { Metadata } from 'next';
-import { ThemeProvider } from 'next-themes';
-import AppNav from '@/components/app-nav';
+import type { Metadata, Viewport } from 'next';
+import { connection } from 'next/server';
 import './globals.css';
+import Providers from '@/components/providers';
 
 export const metadata: Metadata = {
-  title: '智学伴 — 目标驱动的 AI 学习助手',
-  description: '导入教材，按你的学习目标生成个性化课程，学完即考。',
+  title: { default: '智学伴 — 每句话都有出处的 AI 学习平台', template: '%s · 智学伴' },
+  description: '导入教材、写下学习目标，Agent 读书编课，每句讲解都标明出自原书第几段，掌握要用不同的题证明。',
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  themeColor: '#f3f3f1',
+};
+
+// CSP nonce 只能在请求时注入：所有页面动态渲染（见 src/proxy.ts）
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  await connection();
   return (
-    <html lang="zh-CN" suppressHydrationWarning>
-      <body className="min-h-screen antialiased">
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <a
-            href="#main"
-            className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-accent focus:px-4 focus:py-2 focus:text-accent-foreground"
-          >
-            跳到主内容
-          </a>
-          <AppNav />
-          {children}
-        </ThemeProvider>
+    <html lang="zh-CN">
+      <body className="min-h-screen">
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

@@ -1,0 +1,39 @@
+# systemd 单元：/etc/systemd/system/zhixueban.service
+# 应用目录 /srv/zhixueban（含 data/），以专用用户 zhixueban 运行，只监听本机，由 Nginx 反代。
+[Unit]
+Description=智学伴 线上站
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=zhixueban
+Group=zhixueban
+WorkingDirectory=/srv/zhixueban
+EnvironmentFile=/etc/zhixueban/env
+ExecStart=/usr/bin/node node_modules/next/dist/bin/next start -p 3101 -H 127.0.0.1
+# 停止时给进行中的请求与后台任务 30 秒收尾；未完成的生成任务租约到期后可在页面「继续」
+KillSignal=SIGTERM
+TimeoutStopSec=30
+Restart=on-failure
+RestartSec=5
+
+# 加固：只允许写 data/ 与 .next/cache
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/zhixueban/data /srv/zhixueban/.next/cache
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+# 日志只进 journald；应用不记录请求头与模型 Key
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
