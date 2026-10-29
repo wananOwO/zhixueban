@@ -37,6 +37,8 @@
 
 **用户决定（2026-10-30）：** 缩小范围，本次只做阶段 1、2、6、7、8。阶段 3（Obsidian 导入）、4（MCP）、5（设置页 MCP/Obsidian/模板分区）延后；本次设置页只加阶段 2 需要的 vault 路径。main 上的 MCP 与 Obsidian 旧代码保留在 git 历史里（提交 4ba13a7、dcfb0b8）。
 
+**执行中的决定：** 本机 Docker 守护进程未运行，无法构建验证镜像，因此不提交新的 Dockerfile；线上部署以 deploy/（systemd + Nginx + Judge0 compose）为准。合并时删除 main 上旧的 Dockerfile、docker-compose.yml、.env.example（端口、环境变量均已过时），它们保留在提交 8fd4546 的历史里。
+
 ## 风险
 
 - MCP 与 Obsidian 是新增攻击面：MCP URL 走 `assertPublicUrl`（线上），vault zip 限制解压后总大小与文件数，拒绝 `..` 路径。
