@@ -74,7 +74,7 @@ export function DraftPage({ draftId }: { draftId: string }) {
       )}
       {data && data.state === 'generating' && data.generationJobId && (
         <>
-          <GenerationView jobId={data.generationJobId} onFinished={() => void draft.refetch()} />
+          <GenerationView jobId={data.generationJobId} title="课程方案的生成过程" runningTitle="正在生成课程方案" onFinished={() => void draft.refetch()} />
           <GenerationFailedActions draft={data} onBack={() => void backToEdit()} />
         </>
       )}

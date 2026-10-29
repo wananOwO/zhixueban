@@ -7,7 +7,10 @@ export const navItems = [
   { href: '/settings', label: '设置' },
 ] as const;
 
+/** 学习与历史回看从课程进入，顶栏归在「我的课程」下 */
+const SECTION_ALIASES: Record<string, string[]> = { '/courses': ['/learn'] };
+
 export function isActive(pathname: string, href: string): boolean {
   if (href === '/') return pathname === '/';
-  return pathname === href || pathname.startsWith(href + '/');
+  return [href, ...(SECTION_ALIASES[href] ?? [])].some(base => pathname === base || pathname.startsWith(base + '/'));
 }

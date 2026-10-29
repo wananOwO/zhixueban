@@ -56,6 +56,9 @@ test.describe('生成过程与方案审核', () => {
     });
     await page.goto('/drafts/d1');
     await expect(page.getByText('服务器已重启，模型 Key 只保存在你的浏览器里')).toBeVisible();
+    // 任务已结束：标题不再写「正在生成」
+    await expect(page.getByRole('heading', { name: '课程方案的生成过程' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '正在生成课程方案' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: '继续任务' })).toBeVisible();
     await expect(page.getByRole('button', { name: '返回编辑并重新生成' })).toBeVisible();
   });

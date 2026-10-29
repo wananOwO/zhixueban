@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { navItems } from '@/lib/nav';
+import { isActive, navItems } from '@/lib/nav';
 
 function pages(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap(entry => entry.isDirectory()
@@ -23,6 +23,14 @@ describe('朱批本前端路由', () => {
     for (const file of ['src/app/verified-learning', 'src/components/verified-learning', 'src/lib/navigation.ts', 'src/lib/verified-learning/client.ts']) {
       expect(existsSync(file), file).toBe(false);
     }
+  });
+  it('学习与历史回看页归在「我的课程」下（样张 a-zhupi）', () => {
+    const current = (pathname: string) => navItems.filter(item => isActive(pathname, item.href)).map(item => item.label);
+    expect(current('/learn/s1')).toEqual(['我的课程']);
+    expect(current('/learn/s1/history')).toEqual(['我的课程']);
+    expect(current('/courses/c1')).toEqual(['我的课程']);
+    expect(current('/learning')).toEqual([]);
+    expect(current('/')).toEqual(['首页']);
   });
   it('顶栏只在 (app) 布局挂载一次', () => {
     expect(readFileSync('src/app/(app)/layout.tsx', 'utf8')).toContain('<TopBar');

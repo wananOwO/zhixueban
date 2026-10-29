@@ -17,6 +17,7 @@ import { ConfirmButton } from '@/components/ui/confirm';
 import { Panel } from '@/components/ui/panel';
 import { BlockError } from '@/components/states/block-states';
 import { Tape } from '@/components/zhupi/tape';
+import { GradeMark } from '@/components/zhupi/grade-mark';
 
 const RUNNING = new Set(['queued', 'running']);
 
@@ -24,9 +25,11 @@ const RUNNING = new Set(['queued', 'running']);
  * 生成过程：Agent 在读教材哪里、提交了什么、哪里校验没过又自动修正。
  * 实时进度来自 SSE；轨迹（书带与读取范围）每收到 5 个事件或任务结束时刷新一次。
  */
-export function GenerationView({ jobId, title = '正在生成课程方案', compact = false, onFinished }: {
+export function GenerationView({ jobId, title = '正在生成课程方案', runningTitle, compact = false, onFinished }: {
   jobId: string;
   title?: string;
+  /** 任务进行中时的标题；结束后（完成、失败、停止）改用 title */
+  runningTitle?: string;
   compact?: boolean;
   onFinished?: (job: JobView) => void;
 }) {
@@ -94,13 +97,13 @@ export function GenerationView({ jobId, title = '正在生成课程方案', comp
   return (
     <div className={cn('grid gap-6', !compact && 'mt-6')}>
       <Panel
-        title={title}
+        title={running && runningTitle ? runningTitle : title}
         description={job && (
           <span aria-live="polite">
-            {JOB_KIND_LABEL[job.kind] ?? job.kind} · {JOB_STATUS_LABEL[job.status] ?? job.status}
+            <span className="whitespace-nowrap">{JOB_KIND_LABEL[job.kind] ?? job.kind} · {JOB_STATUS_LABEL[job.status] ?? job.status}</span>
             {job.status === 'running' && job.stage && ` · ${job.stage}`}
-            {elapsed > 0 && ` · 已用 ${formatDuration(elapsed)}`}
-            {job.attempts > 1 && ` · 第 ${job.attempts} 次执行`}
+            {elapsed > 0 && <span className="whitespace-nowrap">{` · 已用 ${formatDuration(elapsed)}`}</span>}
+            {job.attempts > 1 && <span className="whitespace-nowrap">{` · 第 ${job.attempts} 次执行`}</span>}
           </span>
         )}
         actions={
@@ -160,8 +163,8 @@ export function GenerationView({ jobId, title = '正在生成课程方案', comp
                 <li key={line.key} className={cn('row-enter grid grid-cols-[5.5rem_minmax(0,1fr)] gap-3 border-t border-rule py-2 text-base first:border-t-0', index === 0 && running && 'text-zhu')}>
                   <time className="text-sm tabular-nums text-muted">{line.at ? formatClock(line.at) : ''}</time>
                   <span className="min-w-0">
-                    {!line.ok && <span className="mr-1.5 text-zhu" aria-hidden>✗</span>}
                     {!line.ok && <span className="sr-only">校验未通过：</span>}
+                    {!line.ok && <span aria-hidden className="mr-1.5 inline-block align-[-0.05em]"><GradeMark kind="no" size="sm" /></span>}
                     {line.text}
                     {line.error && <span className="mt-0.5 block text-sm text-muted">{line.error}</span>}
                   </span>

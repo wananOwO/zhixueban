@@ -1,0 +1,57 @@
+# Judge0 CE 1.13.1（官方 docker-compose 的改写）：只给本机的智学伴调用。
+# 与官方相比：镜像固定到 1.13.1（修复 CVE-2024-28185/28189/29021）、端口只绑 127.0.0.1、
+# db/redis 放在不对外的内部网络。server/worker 仍需 privileged（Judge0 用 isolate 沙箱，官方要求）。
+# 系统要求：Linux，cgroup v1（Ubuntu 22.04 需在 GRUB 加 systemd.unified_cgroup_hierarchy=0 后重启），见 deploy/README.md。
+x-logging: &default-logging
+  logging:
+    driver: json-file
+    options:
+      max-size: 100M
+
+services:
+  server:
+    image: judge0/judge0:1.13.1
+    volumes:
+      - ./judge0.conf:/judge0.conf:ro
+    ports:
+      - "127.0.0.1:2358:2358"
+    privileged: true
+    # edge 只用于发布本机端口；backend 是不通外网的内部网络
+    networks: [edge, backend]
+    <<: *default-logging
+    restart: always
+
+  worker:
+    image: judge0/judge0:1.13.1
+    command: ["./scripts/workers"]
+    volumes:
+      - ./judge0.conf:/judge0.conf:ro
+    privileged: true
+    networks: [backend]
+    <<: *default-logging
+    restart: always
+
+  db:
+    image: postgres:16.2
+    env_file: judge0.conf
+    volumes:
+      - data:/var/lib/postgresql/data/
+    networks: [backend]
+    <<: *default-logging
+    restart: always
+
+  redis:
+    image: redis:7.2.4
+    command: ["bash", "-c", 'docker-entrypoint.sh --appendonly no --requirepass "$$REDIS_PASSWORD"']
+    env_file: judge0.conf
+    networks: [backend]
+    <<: *default-logging
+    restart: always
+
+networks:
+  edge: {}
+  backend:
+    internal: true
+
+volumes:
+  data:

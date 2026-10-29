@@ -312,3 +312,36 @@ GET `/judge` 返回可用语言。C编译/运行都交给服务；accepted/wrong
 - 有 ID 的教材、草稿、课程、学习、历史及旧课详情仍通过实际数据列表/确认结果/课程内链接到达，不创建虚构 ID 链接。导航测试扫描所有静态页面，新增页面漏加目录会失败。
 - 本轮验证：真实 Chromium 从根首页点击设置、登录、保存交互及清空密钥输入（浏览器保存响应模拟，不写用户配置）；从增强首页逐一点击 9 个入口均成功，390px 窄屏设置页无横向溢出、无页面异常。真实数据库保存/回读/模型配置生效在独立临时测试库验证。未使用真实供应商密钥或发起付费调用。
 - 全量测试 37 文件 / 293 项通过，类型检查与生产构建通过。开发服务使用现有 3101 实例，未重启、未修改其数据库与供应商配置。
+
+## 10. 前端重做后的路由与接口（2026-10-27 起，替代第 9 节的旧路由）
+
+旧版前端已备份为 Git 标签 `frontend-v1-backup`；以下为当前页面与新增接口。设计规格：`docs/superpowers/specs/2026-10-27-frontend-redesign-design.md`。
+
+### 页面
+
+| 路由 | 内容 |
+|---|---|
+| `/` | 首页：最近课程的下一步、掌握条与先修路线图，没写完的草稿，正在生成的任务；空库时三步引导 |
+| `/library`、`/library/[bookId]` | 教材库（拖放上传、按模式显示上限）；教材详情（目录、按段号排列的原文，`#p-段号` 定位并朱批高亮，删除影响） |
+| `/drafts`、`/drafts/[draftId]` | 草稿列表；草稿按状态显示编辑器 / 生成过程（SSE + 书带）/ 方案审核（先修路线图） |
+| `/courses`、`/courses/[courseId]?tab=&versionId=` | 课程列表（真实掌握比例）；课程主页（路线图、下一步、最近活动、资料来源；标签页：笔记、历史回看、资料来源、生成过程） |
+| `/learn/[sessionId]?point=` | 学习：课件（朱批旁注、只划被引用的那一句）、题组（四级提示、批改落笔、编程题判题轮询）、流式助教；≥1440 三栏，1024–1439 旁注抽屉，<1024 单栏 |
+| `/learn/[sessionId]/history?run=` | 历史回看：时间线 + 只读课件与作答（含答案与解析） |
+| `/settings` | 设置：本地写数据库；线上只存浏览器 |
+
+### 新增接口
+
+| 方法/路径 | 说明 |
+|---|---|
+| GET `/mode` | `{mode:'local'|'online',uploadLimitBytes,booksPerSpace}` |
+| GET `/jobs/{id}/stream` | SSE：`progress` 事件（带 `id` 即游标）、`job` 快照、终态后 `end`；支持 `Last-Event-ID` 续传 |
+| GET `/jobs/{id}/trace` | 脱敏 Agent 轨迹：工具名、读取区间、搜索词、引用段号、题号、错误类别；不含提示、正文、答案 |
+| POST `/sessions/{id}/tutor` | 助教：Vercel AI SDK UI message stream；请求 `{messages(≤20),runId?,selection?}`；回答以 `〔来源ID·第N段〕` 标出处；作答期间不含答案与解析 |
+| GET `/progress?versionId=` | 新增 `recent`（每个知识点最近 5 道计入证据的不同题对错）与 `evidenceQuestions` |
+| GET `/sessions/{id}` | 新增 `nextPrepared`：下一活动内容已预先生成（示例课程），开始时不调用模型 |
+
+### 线上模式
+
+- 环境变量：`VL_MODE=online`、`VL_PUBLIC_ORIGIN`、`VL_ACCESS_CODE`、`VL_SAMPLE_PATH`（可选），见 `deploy/env.example`。
+- 需要模型的请求带 `X-VL-Model`（base64url JSON：`{provider,baseUrl,apiKey,model}`）：发起生成、继续任务、开始需要生成的活动、补练、助教、拉取模型列表。Key 只放进程内存，任务结束即删除。
+- 部署与运维：`deploy/README.md`；Key 不落盘检查：`scripts/check-key-leak.ts`。

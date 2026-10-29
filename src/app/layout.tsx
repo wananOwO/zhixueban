@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import { connection } from 'next/server';
 import './globals.css';
 import Providers from '@/components/providers';
 
@@ -13,7 +14,9 @@ export const viewport: Viewport = {
   themeColor: '#f3f3f1',
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+// CSP nonce 只能在请求时注入：所有页面动态渲染（见 src/proxy.ts）
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  await connection();
   return (
     <html lang="zh-CN">
       <body className="min-h-screen">
