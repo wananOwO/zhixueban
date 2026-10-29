@@ -94,7 +94,18 @@ curl -s -H "X-Auth-Token: <AUTHN_TOKEN>" http://127.0.0.1:2358/languages | head 
 
 ## 六、示例课程
 
-见 `docs/verified-learning/sample-course.md`。导出文件放到 `/srv/zhixueban/data/sample/course.json`，`VL_SAMPLE_PATH` 已在 `env.example` 里指向它。之后新建的空间自动带上示例课程；已有空间不受影响。
+线上站的每个新空间会自动复制一门预置示例课程，评委不填模型 Key 也能读课件、答题、看生成过程回放。已有空间不受影响。
+
+1. 在一个一次性本地库里上传可公开的教材（例如 Python 官方中文教程、OI Wiki），按正常流程生成方案并确认，学完第一个课件并生成第一组练习（不作答）。这一步会调用模型、产生费用。
+2. 导出（只读打开数据库）：
+
+```bash
+pnpm vl:sample-export --db data/<一次性库>.db --scope local-owner --course <课程ID> --out course.json
+```
+
+3. 把 `course.json` 放到 `/srv/zhixueban/data/sample/course.json`（`env.example` 里的 `VL_SAMPLE_PATH` 已指向它），然后 `sudo systemctl restart zhixueban`。
+
+导出内容：课程版本与审核记录、用到的资料快照（不带上传文件）、重置为未开始的学习会话、已生成的课件与题组、生成任务的结果与轨迹。轨迹只保留工具名、读取区间、搜索词、引用段号等，不含提示词与模型原文。不导出作答、笔记和其他草稿。未配置 `VL_SAMPLE_PATH` 或文件不存在时跳过，线上站照常可用。
 
 ## 七、备份
 

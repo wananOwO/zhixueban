@@ -49,7 +49,7 @@ Linux 或 macOS 上把第 3 步换成 `export VERIFIED_LEARNING_LOCAL=1` 等写�
 
 同一份代码设置 `VL_MODE=online` 即为公网模式：访问码登录，每个浏览器一个独立空间；评委的模型 Key 只保存在自己的浏览器里，服务器只在内存中使用，任务结束即删除，不写数据库和日志。新空间会自动带上一门示例课程，不填 Key 也能浏览和答题。
 
-Nginx、systemd、Judge0 的配置与运维步骤见 [`deploy/README.md`](deploy/README.md)，示例课程的制作见 [`docs/verified-learning/sample-course.md`](docs/verified-learning/sample-course.md)。
+Nginx、systemd、Judge0 的配置、示例课程的制作与运维步骤见 [`deploy/README.md`](deploy/README.md)。
 
 ## 测试
 
@@ -93,13 +93,6 @@ src/lib/verified-learning/       后端：教材库、课程、学习、判题�
 src/lib/verified-learning/agent/ 生成 Agent：工具、会话日志、模型连接
 src/lib/textbook/                教材解析（含纯 JS 的 MOBI/AZW3 解析）
 prompts/subjects/                六类学科提示词
-deploy/                          线上部署配置
-docs/                            技术文档、演示视频脚本、示例课程说明
+deploy/                          线上部署配置与运维说明
 tests/                           Vitest 与 Playwright 测试
 ```
-
-## 文档
-
-- 技术文档：[`docs/技术文档.md`](docs/技术文档.md)
-- 演示视频脚本：[`docs/演示视频脚本.md`](docs/演示视频脚本.md)
-- 示例课程：[`docs/verified-learning/sample-course.md`](docs/verified-learning/sample-course.md)

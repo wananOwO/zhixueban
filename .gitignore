@@ -10,14 +10,10 @@ test-results/
 playwright-report/
 .unipi/
 
-# 开发过程文件：只留在本机，不进远程仓库
+# 开发过程文件与文档：只留在本机，不进远程仓库
+docs/
 AGENTS.md
 Task/
-docs/superpowers/
-docs/contracts/
-docs/coordination/
-docs/verified-learning/backend-status.md
-docs/verified-learning/frontend-handoff.md
 scripts/check-unified-ui.cjs
 scripts/dev-seed-*.mjs
 scripts/inspect-page.mjs
