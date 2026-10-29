@@ -1,22 +1,26 @@
 'use client';
 
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Download, Loader2 } from 'lucide-react';
 import { API_BASE, ApiError, api, newKey } from '@/lib/api/client';
 import { useNotes } from '@/lib/api/hooks';
-import { queryKeys } from '@/lib/api/queries';
+import { queryKeys, useMode } from '@/lib/api/queries';
 import { formatShortTime } from '@/lib/utils';
-import type { CoursePointView, NoteView } from '@/lib/api/types';
+import type { CoursePointView, NoteView, SettingsView } from '@/lib/api/types';
 import { Button } from '@/components/ui/button';
 import { Field, Select, Textarea } from '@/components/ui/field';
 import { Panel } from '@/components/ui/panel';
 import { BlockEmpty, BlockError, BlockLoading } from '@/components/states/block-states';
 
-/** 笔记：按知识点分组；新建、编辑（修订号冲突时保留输入）、导出 Markdown */
+/** 笔记：按知识点分组；新建、编辑（修订号冲突时保留输入）、导出 Markdown、写入本机 Obsidian（本地模式） */
 export function NotesTab({ courseId, versionId, points }: { courseId: string; versionId: string; points: CoursePointView[] }) {
   const client = useQueryClient();
   const notes = useNotes(courseId);
+  const mode = useMode();
+  const local = mode.data?.mode === 'local';
+  const settings = useQuery({ queryKey: queryKeys.settings(), queryFn: () => api<SettingsView>('/settings'), enabled: local });
+  const vault = local && Boolean(settings.data?.obsidian_vault_path);
   const [pointId, setPointId] = useState(points[0]?.knowledgePointId ?? '');
   const [content, setContent] = useState('');
   const refresh = () => client.invalidateQueries({ queryKey: queryKeys.notes(courseId) });
@@ -40,7 +44,7 @@ export function NotesTab({ courseId, versionId, points }: { courseId: string; ve
               <section key={id} aria-label={titleOf(id)}>
                 <h3 className="font-medium">{titleOf(id)}</h3>
                 <div className="mt-2 grid gap-3">
-                  {notes.data!.filter(n => n.knowledgePointId === id).map(note => <NoteItem key={note.noteId} note={note} onSaved={() => void refresh()} />)}
+                  {notes.data!.filter(n => n.knowledgePointId === id).map(note => <NoteItem key={note.noteId} note={note} vault={vault} onSaved={() => void refresh()} />)}
                 </div>
               </section>
             ))}
@@ -70,9 +74,10 @@ export function NotesTab({ courseId, versionId, points }: { courseId: string; ve
   );
 }
 
-function NoteItem({ note, onSaved }: { note: NoteView; onSaved: () => void }) {
+function NoteItem({ note, vault, onSaved }: { note: NoteView; vault: boolean; onSaved: () => void }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(note.content);
+  const write = useMutation({ mutationFn: () => api<{ path: string }>(`/notes/${encodeURIComponent(note.noteId)}/vault`, { method: 'POST' }) });
   const save = useMutation({
     mutationFn: () => api<NoteView>(`/notes/${encodeURIComponent(note.noteId)}`, {
       method: 'PATCH',
@@ -108,7 +113,14 @@ function NoteItem({ note, onSaved }: { note: NoteView; onSaved: () => void }) {
             <a className="inline-flex items-center gap-1 hover:text-ink" href={`${API_BASE}/notes/${encodeURIComponent(note.noteId)}/export`} download>
               <Download className="size-3.5" aria-hidden />导出 Markdown
             </a>
+            {vault && (
+              <button type="button" className="inline-flex items-center gap-1 hover:text-ink disabled:opacity-60" disabled={write.isPending} onClick={() => write.mutate()}>
+                {write.isPending && <Loader2 className="size-3.5 animate-spin" aria-hidden />}写入 Obsidian
+              </button>
+            )}
           </div>
+          {write.data && <p role="status" className="mt-1 break-all text-sm text-muted">已写入 {write.data.path}</p>}
+          <BlockError className="mt-2" error={write.error} />
         </>
       )}
     </article>

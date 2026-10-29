@@ -23,6 +23,26 @@ test.describe('设置页', () => {
     expect(patch?.body).toMatchObject({ llm_model: 'deepseek-reasoner', llm_api_key: '' });
   });
 
+  test('本地模式：Obsidian vault 路径单独保存，只发这一项；线上模式不显示', async ({ page }) => {
+    const calls = await mockApi(page, {
+      ...baseRoutes,
+      ...judgeOk,
+      'GET /settings': () => ({ data: { ...localSettings, obsidian_vault_path: '' } }),
+      'PATCH /settings': ({ body }) => ({ data: { ...localSettings, ...(body as object) } }),
+    });
+    await page.goto('/settings');
+    await page.getByLabel('vault 文件夹').fill('D:\\Obsidian\\学习笔记');
+    await page.getByRole('button', { name: '保存路径' }).click();
+    await expect(page.getByRole('status').filter({ hasText: '写入 Obsidian' })).toBeVisible();
+    const patch = calls.find(c => c.method === 'PATCH' && c.path === '/settings');
+    expect(patch?.body).toEqual({ obsidian_vault_path: 'D:\\Obsidian\\学习笔记' });
+
+    await mockApi(page, { ...baseRoutes, ...online, ...judgeOk, 'GET /settings': () => ({ data: { llm_provider: 'openai-compatible', online: true } }) });
+    await page.reload();
+    await expect(page.getByRole('heading', { level: 1, name: '设置' })).toBeVisible();
+    await expect(page.getByLabel('vault 文件夹')).toHaveCount(0);
+  });
+
   test('线上模式：保存不发 PATCH，写入 localStorage；清除后为空', async ({ page }) => {
     const calls = await mockApi(page, { ...baseRoutes, ...online, ...judgeOk, 'GET /settings': () => ({ data: { llm_provider: 'openai-compatible', online: true } }) });
     await page.goto('/settings');

@@ -82,7 +82,14 @@ describe('本机供应商设置', () => {
     expect((await PATCH(request('PATCH', { llm_model: null }, cookie), context())).status).toBe(200);
     expect(getModel().modelId).toBe('environment-model');
   });
-  it.each([{ llm_provider: 'invalid' }, { llm_base_url: 'javascript:alert(1)' }, { llm_model: 'changed', unexpected: 'bad' }])('无效设置整批拒绝：%j', async (patch) => {
+  it('Obsidian vault 路径可保存、读取与清除', async () => {
+    const vault = path.join(testDirectory(), 'vault');
+    expect((await PATCH(request('PATCH', { obsidian_vault_path: vault }, cookie), context())).status).toBe(200);
+    expect((await (await GET(request('GET', undefined, cookie), context())).json()).data.obsidian_vault_path).toBe(vault);
+    expect((await PATCH(request('PATCH', { obsidian_vault_path: null }, cookie), context())).status).toBe(200);
+    expect((await (await GET(request('GET', undefined, cookie), context())).json()).data.obsidian_vault_path).toBe('');
+  });
+  it.each([{ llm_provider: 'invalid' }, { llm_base_url: 'javascript:alert(1)' }, { llm_model: 'changed', unexpected: 'bad' }, { obsidian_vault_path: 'relative/vault' }])('无效设置整批拒绝：%j', async (patch) => {
     expect((await PATCH(request('PATCH', patch, cookie), context())).status).toBe(400);
     expect(getModel().modelId).toBe('environment-model');
   });

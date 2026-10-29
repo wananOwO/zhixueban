@@ -1,4 +1,5 @@
 import type Database from 'better-sqlite3';
+import path from 'node:path';
 import { z } from 'zod';
 import { parse } from './backend-contracts';
 
@@ -9,10 +10,13 @@ const url = z.string().trim().max(2000).refine(value => {
   catch { return false; }
 });
 const secret = z.string().trim().max(4096);
+// 本机 Obsidian vault：只接受绝对路径（笔记写入时再检查是否存在）
+const folder = z.string().trim().max(1000).refine(value => !value || path.isAbsolute(value), '请填写绝对路径');
 const schema = z.strictObject({
   llm_provider: z.enum(['openai-compatible', 'anthropic']).nullable().optional(),
   llm_model: text.nullable().optional(), llm_base_url: url.nullable().optional(), llm_api_key: secret.nullable().optional(),
   embedding_model: text.nullable().optional(), embedding_base_url: url.nullable().optional(), embedding_api_key: secret.nullable().optional(),
+  obsidian_vault_path: folder.nullable().optional(),
 });
 const keys = Object.keys(schema.shape);
 

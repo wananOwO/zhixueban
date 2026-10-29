@@ -39,6 +39,7 @@ export function SettingsPage() {
       <PageHeader title="设置" description={online ? '生成课程、课件、题目和助教回答都用你自己的模型 Key。' : '本机使用的模型供应商。网页设置优先于环境变量；Key 只保存在本机数据库，不回显。'} />
       <div className="mt-6 grid gap-6">
         {mode.isPending ? <Section title="模型供应商"><BlockLoading lines={6} /></Section> : online ? <OnlineForm /> : <LocalForm />}
+        {!mode.isPending && !online && <ObsidianForm />}
         <JudgeStatus />
       </div>
     </>
@@ -106,6 +107,34 @@ function LocalForm() {
         <BlockError error={save.error} />
         <div className="flex flex-wrap items-center gap-4">
           <Button type="submit" variant="primary" disabled={save.isPending}>{save.isPending && <Loader2 className="animate-spin" aria-hidden />}保存设置</Button>
+          <p role="status" className="text-sm text-muted">{message}</p>
+        </div>
+      </form>
+    </Section>
+  );
+}
+
+/** 本地模式：本机 Obsidian vault 路径。笔记「写入 Obsidian」时写到 <vault>/智学伴/<课程>/ 下 */
+function ObsidianForm() {
+  const client = useQueryClient();
+  const settings = useQuery({ queryKey: queryKeys.settings(), queryFn: () => api<SettingsView>('/settings') });
+  const [vault, setVault] = useState('');
+  const [message, setMessage] = useState('');
+  useEffect(() => { if (settings.data) setVault(String(settings.data.obsidian_vault_path ?? '')); }, [settings.data]);
+  const save = useMutation({
+    mutationFn: () => api<SettingsView>('/settings', { method: 'PATCH', body: { obsidian_vault_path: vault.trim() || null } }),
+    onSuccess: data => { client.setQueryData(queryKeys.settings(), data); setMessage(vault.trim() ? '已保存。在课程的笔记里点「写入 Obsidian」。' : '已清除。'); },
+  });
+  if (settings.isPending || settings.error) return null;
+  return (
+    <Section title="Obsidian" description="笔记可以写入本机的 Obsidian vault，放在「智学伴/课程名/」下，每个知识点一个文件，重复写入会覆盖。">
+      <form className="grid gap-5" onSubmit={event => { event.preventDefault(); setMessage(''); save.mutate(); }}>
+        <Field label="vault 文件夹" htmlFor="obsidian-vault" hint="填绝对路径，例如 D:\Obsidian\学习笔记。留空表示不用。">
+          <Input id="obsidian-vault" aria-describedby="obsidian-vault-hint" value={vault} maxLength={1000} spellCheck={false} placeholder="D:\Obsidian\学习笔记" onChange={event => { setVault(event.target.value); setMessage(''); }} />
+        </Field>
+        <BlockError error={save.error} />
+        <div className="flex flex-wrap items-center gap-4">
+          <Button type="submit" disabled={save.isPending}>{save.isPending && <Loader2 className="animate-spin" aria-hidden />}保存路径</Button>
           <p role="status" className="text-sm text-muted">{message}</p>
         </div>
       </form>

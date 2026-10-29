@@ -149,6 +149,38 @@ test.describe('课程列表与课程主页', () => {
     expect(post?.headers['idempotency-key']).toBeTruthy();
   });
 
+  test('本地模式配了 vault：笔记可「写入 Obsidian」并显示写入位置；未配置时不显示该按钮', async ({ page }) => {
+    const existing = { noteId: 'n1', courseId: 'c1', versionId: 'v1', knowledgePointId: 'py-list', revision: 0, content: '列表下标从 0 开始' };
+    let vaultPath = '';
+    const calls = await mockApi(page, routes({
+      'GET /notes': () => ({ data: [existing] }),
+      'GET /settings': () => ({ data: { llm_provider: 'openai-compatible', obsidian_vault_path: vaultPath } }),
+      'POST /notes/n1/vault': () => ({ data: { path: 'D:\\Obsidian\\智学伴\\python算法入门\\列表.md' } }),
+    }));
+    await page.goto('/courses/c1?tab=notes');
+    await expect(page.getByRole('article').filter({ hasText: '列表下标从 0 开始' })).toBeVisible();
+    await expect(page.getByRole('button', { name: '写入 Obsidian' })).toHaveCount(0);
+
+    vaultPath = 'D:\\Obsidian';
+    await page.reload();
+    await page.getByRole('button', { name: '写入 Obsidian' }).click();
+    await expect(page.getByRole('status').filter({ hasText: '已写入' })).toContainText('智学伴');
+    expect(calls.some(c => c.method === 'POST' && c.path === '/notes/n1/vault')).toBe(true);
+  });
+
+  test('线上模式笔记不显示「写入 Obsidian」', async ({ page }) => {
+    const existing = { noteId: 'n1', courseId: 'c1', versionId: 'v1', knowledgePointId: 'py-list', revision: 0, content: '线上笔记' };
+    const calls = await mockApi(page, routes({
+      'GET /mode': () => ({ data: { mode: 'online', uploadLimitBytes: 20 * 1024 * 1024, booksPerSpace: 10 } }),
+      'GET /notes': () => ({ data: [existing] }),
+    }));
+    await page.goto('/courses/c1?tab=notes');
+    await expect(page.getByRole('article').filter({ hasText: '线上笔记' })).toBeVisible();
+    await expect(page.getByRole('link', { name: '导出 Markdown' })).toBeVisible();
+    await expect(page.getByRole('button', { name: '写入 Obsidian' })).toHaveCount(0);
+    expect(calls.some(c => c.path === '/settings')).toBe(false);
+  });
+
   test('切换标签页更新网址；资料来源标签列出上传与联网补充', async ({ page }) => {
     await mockApi(page, routes());
     await page.goto('/courses/c1');
