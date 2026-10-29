@@ -9,3 +9,19 @@ data/
 test-results/
 playwright-report/
 .unipi/
+
+# 开发过程文件：只留在本机，不进远程仓库
+AGENTS.md
+Task/
+docs/superpowers/
+docs/contracts/
+docs/coordination/
+docs/verified-learning/backend-status.md
+docs/verified-learning/frontend-handoff.md
+scripts/check-unified-ui.cjs
+scripts/dev-seed-*.mjs
+scripts/inspect-page.mjs
+scripts/shot.mjs
+scripts/smoke-frontend-api.mjs
+scripts/start-local.mjs
+scripts/verify-learning-agent.ts

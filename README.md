@@ -94,7 +94,7 @@ src/lib/verified-learning/agent/ 生成 Agent：工具、会话日志、模型�
 src/lib/textbook/                教材解析（含纯 JS 的 MOBI/AZW3 解析）
 prompts/subjects/                六类学科提示词
 deploy/                          线上部署配置
-docs/                            设计规格、实施计划、技术文档
+docs/                            技术文档、演示视频脚本、示例课程说明
 tests/                           Vitest 与 Playwright 测试
 ```
 
@@ -102,4 +102,4 @@ tests/                           Vitest 与 Playwright 测试
 
 - 技术文档：[`docs/技术文档.md`](docs/技术文档.md)
 - 演示视频脚本：[`docs/演示视频脚本.md`](docs/演示视频脚本.md)
-- 接口与前端约定：[`docs/verified-learning/frontend-handoff.md`](docs/verified-learning/frontend-handoff.md)
+- 示例课程：[`docs/verified-learning/sample-course.md`](docs/verified-learning/sample-course.md)

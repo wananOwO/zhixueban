@@ -1,5 +1,5 @@
 /**
- * 前后端契约类型（以 docs/verified-learning/frontend-handoff.md 与 route.ts 为准）。
+ * 前后端契约类型（以 src/app/api/verified-learning/v1/[[...path]]/route.ts 与各服务的返回值为准）。
  * 由第一版 src/lib/verified-learning/client.ts 迁移，字段保持不变。
  */
 
