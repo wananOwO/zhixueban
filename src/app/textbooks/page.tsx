@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { BookOpen, FileUp, Loader2 } from 'lucide-react';
+import SetupNotice from '@/components/setup-notice';
 
 const ACCEPT = '.txt,.md,.markdown,.epub,.pdf,.docx,.mobi,.azw3';
 
@@ -12,8 +13,10 @@ export default function TextbooksPage() {
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
 
   async function upload(file: File) {
+    if (!ready || uploading) return;
     setError(null);
     setUploading(true);
     try {
@@ -42,10 +45,11 @@ export default function TextbooksPage() {
       <p className="mb-8 text-muted-foreground">
         支持 TXT / Markdown / EPUB / PDF / DOCX / MOBI / AZW3
       </p>
+      <SetupNotice onReady={setReady} />
 
       <button
         type="button"
-        disabled={uploading}
+        disabled={uploading || !ready}
         onClick={() => inputRef.current?.click()}
         onDragOver={(e) => {
           e.preventDefault();
@@ -61,7 +65,7 @@ export default function TextbooksPage() {
         aria-label="选择或拖入教材文件"
         aria-busy={uploading}
         className={`flex h-56 w-full flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed transition-colors ${
-          dragging ? 'border-accent bg-muted' : 'border-border hover:border-muted-foreground'
+          dragging ? 'border-accent bg-muted' : 'border-border enabled:hover:border-muted-foreground disabled:cursor-not-allowed disabled:opacity-50'
         }`}
       >
         {uploading ? (

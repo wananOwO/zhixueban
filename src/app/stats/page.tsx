@@ -2,6 +2,7 @@ import { getDb } from '@/lib/db';
 import { dailyActivity, graphData } from '@/lib/stats';
 import Heatmap from '@/components/heatmap';
 import KnowledgeGraphView from '@/components/knowledge-graph-view';
+import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,7 +40,9 @@ export default function StatsPage() {
             </p>
           </>
         ) : (
-          <p className="text-sm text-muted-foreground">还没有学习数据，先去创建一门课程。</p>
+          <p className="text-sm text-muted-foreground">
+            还没有学习数据，先去<Link href="/courses/new" className="text-accent underline">创建一门课程</Link>。
+          </p>
         )}
       </section>
 

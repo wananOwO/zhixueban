@@ -1,6 +1,7 @@
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { createAnthropic } from '@ai-sdk/anthropic';
-import { getConfig } from './config';
+import { getSettings } from './config';
+import { modelConnection, type ModelConnection } from '@/lib/settings';
 
 export class MissingApiKeyError extends Error {
   constructor() {
@@ -9,45 +10,40 @@ export class MissingApiKeyError extends Error {
   }
 }
 
-function requireKey(): string {
-  const apiKey = getConfig('llm_api_key', 'LLM_API_KEY');
-  if (!apiKey) throw new MissingApiKeyError();
-  return apiKey;
-}
-
-const DEFAULT_BASE_URL = 'https://api.deepseek.com/v1';
-
 /**
  * LLM 模型工厂。配置优先级：WebUI 设置（settings 表）> 环境变量。
  * LLM_PROVIDER=anthropic 时走 Anthropic 原生 SDK，否则走 OpenAI 兼容接口
  * （DeepSeek/智谱/OpenAI 均可）。
  */
-export function getModel() {
-  const apiKey = requireKey();
-  const provider = getConfig('llm_provider') ?? 'openai-compatible';
-  const modelId = getConfig('llm_model') ?? 'deepseek-chat';
+export function getModel(connection: ModelConnection = modelConnection(getSettings(), 'llm')) {
+  const { apiKey, provider, modelId, baseURL } = connection;
+  if (!apiKey) throw new MissingApiKeyError();
+  if (!modelId) throw new Error('请在设置页选择对话模型。');
 
   if (provider === 'anthropic') {
-    return createAnthropic({ apiKey })(modelId);
+    return createAnthropic({ apiKey, baseURL, fetch: providerFetch })(modelId);
   }
   const compat = createOpenAICompatible({
     name: 'openai-compatible',
     apiKey,
-    baseURL: getConfig('llm_base_url', 'LLM_BASE_URL') ?? DEFAULT_BASE_URL,
+    baseURL,
+    fetch: providerFetch,
   });
   return compat.chatModel(modelId);
 }
 
 /** Embedding 模型工厂，独立配置项（缺省跟随 LLM 的 baseURL） */
-export function getEmbeddingModel() {
-  const apiKey = getConfig('embedding_api_key') ?? requireKey();
+export function getEmbeddingModel(connection: ModelConnection = modelConnection(getSettings(), 'embedding')) {
+  const { apiKey, baseURL, modelId } = connection;
+  if (!apiKey) throw new MissingApiKeyError();
   const compat = createOpenAICompatible({
     name: 'openai-compatible',
     apiKey,
-    baseURL:
-      getConfig('embedding_base_url') ??
-      getConfig('llm_base_url', 'LLM_BASE_URL') ??
-      DEFAULT_BASE_URL,
+    baseURL,
+    fetch: providerFetch,
   });
-  return compat.embeddingModel(getConfig('embedding_model', 'EMBEDDING_MODEL') ?? 'text-embedding-3-small');
+  return compat.embeddingModel(modelId);
 }
+
+// Provider credentials must not follow redirects to a different service.
+const providerFetch: typeof fetch = (input, init) => fetch(input, { ...init, redirect: 'error' });

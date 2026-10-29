@@ -25,7 +25,9 @@ export default function CoursesPage() {
         </Link>
       </div>
       {courses.length === 0 ? (
-        <p className="text-sm text-muted-foreground">还没有课程。导入教材后来这里创建。</p>
+        <p className="text-sm text-muted-foreground">
+          还没有课程。<Link href="/textbooks" className="text-accent underline">先导入教材</Link>，再创建你的课程。
+        </p>
       ) : (
         <ul className="grid gap-3">
           {courses.map((c) => (

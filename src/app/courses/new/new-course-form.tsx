@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CheckCircle2, Loader2 } from 'lucide-react';
+import Link from 'next/link';
+import SetupNotice from '@/components/setup-notice';
 
 const SUBJECTS = [
   { id: 'computer', name: '计算机类', desc: '重代码示例与上机练习' },
@@ -90,6 +92,7 @@ export default function NewCourseForm({ initialTextbookId }: { initialTextbookId
   return (
     <main id="main" className="mx-auto max-w-2xl px-6 py-12">
       <h1 className="mb-8 text-2xl font-bold">创建课程</h1>
+      <SetupNotice />
 
       <ol aria-label="课程创建步骤" className="mb-10 flex gap-2">
         {STEPS.map((name, i) => (
@@ -114,7 +117,7 @@ export default function NewCourseForm({ initialTextbookId }: { initialTextbookId
           <legend className="mb-4 text-lg font-medium">选择一本教材</legend>
           {textbooks.length === 0 && (
             <p className="text-sm text-muted-foreground">
-              还没有教材，请先到「导入教材」页面上传。
+              还没有教材，请先<Link href="/textbooks" className="text-accent underline">导入教材</Link>。
             </p>
           )}
           <div className="grid gap-3">
