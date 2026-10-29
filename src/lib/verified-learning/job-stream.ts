@@ -27,6 +27,7 @@ export function jobStreamResponse(open: () => Database.Database, scope: string, 
   let closed = false;
   let lastSent = Date.now();
   let lastJob = '';
+  let shutdown = () => { closed = true; if (timer) clearTimeout(timer); };
 
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
@@ -41,6 +42,7 @@ export function jobStreamResponse(open: () => Database.Database, scope: string, 
         db.close();
         try { controller.close(); } catch { /* 已关闭 */ }
       };
+      shutdown = close;
       signal.addEventListener('abort', close, { once: true });
       // 告诉浏览器断线 2 秒后重连（携带 Last-Event-ID）
       send('retry: 2000\n\n');
@@ -72,9 +74,9 @@ export function jobStreamResponse(open: () => Database.Database, scope: string, 
       };
       tick();
     },
+    // 读取方取消（如代理断开但请求信号未中止）：同样停止查询并关闭数据库连接
     cancel() {
-      closed = true;
-      if (timer) clearTimeout(timer);
+      shutdown();
     },
   });
 

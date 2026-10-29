@@ -95,6 +95,22 @@ describe('任务事件 SSE 流', () => {
     expect(text.length).toBe(lengthAfterAbort);
   });
 
+  it('读取方取消流（未触发请求中止）时也关闭流内的数据库连接', async () => {
+    const { db, open } = await fileDb();
+    const jobs = new JobStore(db);
+    const job = jobs.create('s', 'lesson', 'k', {});
+    jobs.claim('s', job.jobId);
+    const handles: Database.Database[] = [];
+    const tracked = () => { const handle = open(); handles.push(handle); return handle; };
+    const response = jobStreamResponse(tracked, 's', job.jobId, 0, new AbortController().signal);
+    const reader = response.body!.getReader();
+    await reader.read();
+    await reader.cancel();
+    // 第一个是归属检查用的连接，第二个是流内连接
+    expect(handles).toHaveLength(2);
+    expect(handles.map(h => h.open)).toEqual([false, false]);
+  });
+
   it('其他空间的任务返回 404 信封而不是流', async () => {
     const { db, open } = await fileDb();
     const job = new JobStore(db).create('s', 'lesson', 'k', {});
