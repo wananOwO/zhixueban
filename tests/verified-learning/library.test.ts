@@ -13,4 +13,16 @@ describe('教材后端',()=>{
  it('有课程引用不允许删除，即使已归档',async()=>{const {db,library}=await setup();const book=await library.importFile('a','key',upload());new VerifiedLearningStore(db).createVersion('a',{textbookId:book.bookId,goal:'学习',outline:[]});const archived=library.archive('a',book.bookId,0,true);expect(library.inspectDeletion('a',book.bookId).blocked).toBe(true);await expect(library.deleteBook('a',book.bookId,archived.revision,archived.title)).rejects.toMatchObject({code:'VALIDATION_FAILED'});expect(library.get('a',book.bookId).archived).toBe(true);});
  it('拒绝不支持格式与相同key不同内容，不改已有教材',async()=>{const {library}=await setup();await library.importFile('a','key',upload());await expect(library.importFile('a','key',new File(['different'],'python.md'))).rejects.toMatchObject({code:'VERSION_CONFLICT'});await expect(library.importFile('a','bad',new File(['x'],'evil.exe'))).rejects.toMatchObject({code:'INVALID_INPUT'});expect(library.list('a')).toHaveLength(1);});
  it('数据库删除失败时保留原文件，用户可重试',async()=>{const db=openTestDb();await migrateVerifiedLearning(db);const root=testDirectory(),library=new LibraryService(db,root);const book=await library.importFile('a','key',upload());const filename=path.join(root,readdirSync(root)[0]);db.exec("CREATE TRIGGER reject_delete BEFORE DELETE ON vl_books BEGIN SELECT RAISE(ABORT,'busy'); END");await expect(library.deleteBook('a',book.bookId,0,book.title)).rejects.toThrow();expect(existsSync(filename)).toBe(true);db.exec('DROP TRIGGER reject_delete');await library.deleteBook('a',book.bookId,0,book.title);expect(existsSync(filename)).toBe(false);});
+ it('上传 MOBI 不需要 calibre：解析出章节与可定位原文',async()=>{
+  const {library}=await setup();
+  const html=Buffer.from('<p>第一章 变量</p><p>变量用于保存数据。</p><p>第二章 循环</p><p>循环重复执行。</p>','utf-8');
+  const rec0=Buffer.alloc(256);rec0.writeUInt16BE(1,0);rec0.writeUInt16BE(1,8);rec0.write('MOBI',16,'ascii');rec0.writeUInt32BE(65001,28);
+  const pdb=Buffer.alloc(78);pdb.write('BOOKMOBI',60,'ascii');pdb.writeUInt16BE(2,76);
+  const table=Buffer.alloc(16);table.writeUInt32BE(94,0);table.writeUInt32BE(94+256,8);
+  const book=await library.importFile('a','mobi',new File([Buffer.concat([pdb,table,rec0,html])],'python.mobi'));
+  expect(book).toMatchObject({status:'ready',format:'mobi',title:'python'});
+  const source=library.source('a',book.bookId);
+  expect(source.chapters.map(c=>c.title).join('|')).toMatch(/变量.*循环/);
+  expect(source.chapters[0].paragraphs[0].text).toContain('变量用于保存数据');
+ });
 });
