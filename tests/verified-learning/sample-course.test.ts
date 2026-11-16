@@ -146,6 +146,24 @@ describe('示例课程：从模板空间导出，种入新空间', () => {
     expect(t.study.get(OTHER, sessionId).session.completedActivityIds).toEqual([]);
   });
 
+  it('种入时不携带派生检索数据，也不新建索引任务', async () => {
+    const t = await template();
+    const snapshot = JSON.parse((t.db.prepare('SELECT snapshot_json FROM vl_course_versions WHERE scope_id=? AND version_id=?').get('template', t.confirmed.versionId) as { snapshot_json: string }).snapshot_json) as { sourceRevisions: { sourceId: string; sourceRevision: string }[] };
+    const { sourceId, sourceRevision } = snapshot.sourceRevisions[0];
+    t.db.prepare(`INSERT INTO vl_retrieval_chunks(scope_id,book_id,source_revision,chapter_id,paragraph_index,part_index,text,content_hash,preprocess_version)
+      VALUES ('template',?,?, 'chapter',0,0,'文本','hash','v1')`).run(sourceId, sourceRevision);
+    t.db.prepare(`INSERT INTO vl_retrieval_vectors(scope_id,book_id,source_revision,chapter_id,paragraph_index,part_index,profile_id,dimensions,vector_blob,status,updated_at)
+      VALUES ('template',?,?,'chapter',0,0,'profile',3,NULL,'failed','t')`).run(sourceId, sourceRevision);
+    t.db.prepare(`INSERT INTO vl_index_jobs(scope_id,job_id,book_id,source_revision,profile_id,status,progress_json,created_at,updated_at)
+      VALUES ('template','job',?,?,'profile','queued','{}','t','t')`).run(sourceId, sourceRevision);
+    const count = (sql: string, scope: string) => (t.db.prepare(sql).get(scope) as { n: number }).n;
+    expect(count('SELECT count(*) AS n FROM vl_retrieval_chunks WHERE scope_id=?', 'template')).toBe(1);
+    seedSample(t.db, SPACE, exportSample(t.db, 'template', t.confirmed.courseId));
+    expect(count('SELECT count(*) AS n FROM vl_retrieval_chunks WHERE scope_id=?', SPACE)).toBe(0);
+    expect(count('SELECT count(*) AS n FROM vl_retrieval_vectors WHERE scope_id=?', SPACE)).toBe(0);
+    expect(count('SELECT count(*) AS n FROM vl_index_jobs WHERE scope_id=?', SPACE)).toBe(0);
+  });
+
   it('导出包格式不对时拒绝种入，不写入任何行', async () => {
     const t = await template();
     expect(() => seedSample(t.db, SPACE, { version: 2, courseId: 'x', tables: {} } as never)).toThrow();

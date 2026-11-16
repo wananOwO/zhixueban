@@ -76,7 +76,7 @@ describe('explicit migration', () => {
     expect(tables(db).filter(row => !(row as { name: string }).name.startsWith('vl_'))).toEqual(oldTables);
     for (const { name, rows } of oldRows) expect(db.prepare(`SELECT * FROM "${name}"`).all()).toEqual(rows);
     expect(db.prepare('SELECT * FROM settings').all()).toEqual([{ key: 'legacy', value: 'kept' }]);
-    expect(db.prepare('SELECT version FROM vl_schema_migrations ORDER BY version').all()).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }, { version: 5 }]);
+    expect(db.prepare('SELECT version FROM vl_schema_migrations ORDER BY version').all()).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }, { version: 5 }, { version: 6 }]);
     expect([db.pragma('foreign_keys'), db.pragma('journal_mode')]).toEqual(pragmas);
     db.exec(`
       INSERT INTO textbooks VALUES ('b','Book','txt','book.txt','{}','2026-10-20T00:00:00.000Z');

@@ -14,8 +14,8 @@ function configure() {
   const directory = testDirectory();
   mkdirSync(path.join(directory, 'data'));
   vi.spyOn(process, 'cwd').mockReturnValue(directory);
-  vi.stubEnv('VERIFIED_LEARNING_LOCAL', '1');
-  vi.stubEnv('VERIFIED_LEARNING_ACCESS_TOKEN', randomBytes(32).toString('base64url'));
+  vi.stubEnv('VL_LOCAL_AUTH', '1');
+  vi.stubEnv('VL_LOCAL_PASSWORD', randomBytes(32).toString('base64url'));
   vi.stubEnv('DB_PATH', path.join(directory, 'data/app.db'));
   return directory;
 }
@@ -29,7 +29,7 @@ describe('服务端按需连接', () => {
   it('关闭时不读数据库配置，不创建默认目录', () => {
     const directory = testDirectory();
     vi.spyOn(process, 'cwd').mockReturnValue(directory);
-    vi.stubEnv('VERIFIED_LEARNING_LOCAL', '0');
+    vi.stubEnv('VL_LOCAL_AUTH', 'invalid');
     expect(() => openVerifiedDb()).toThrow(expect.objectContaining({ code: 'DISABLED' }));
     expect(() => getLocalServices(request())).toThrow(expect.objectContaining({ code: 'DISABLED' }));
     expect(readdirSync(directory)).toEqual([]);
@@ -45,13 +45,13 @@ describe('服务端按需连接', () => {
     const directory = configure();
     await initializeVerifiedLearning('data/app.db', true, directory);
     const db = ownTestDb(openVerifiedDb());
-    const signed = login(db, request('POST'), process.env.VERIFIED_LEARNING_ACCESS_TOKEN!);
+    const signed = login(db, request('POST'), process.env.VL_LOCAL_PASSWORD!);
     expect(() => getLocalServices(request())).toThrow(expect.objectContaining({ code: 'UNAUTHENTICATED' }));
     const services = getLocalServices(request('GET', signed.cookie));
     ownTestDb(services.db);
     expect(services.scopeId).toBe('local-owner');
     expect(services.jobs.list(services.scopeId)).toEqual([]);
-    expect(services.db.prepare('SELECT max(version) AS version FROM vl_schema_migrations').get()).toEqual({ version: 5 });
+    expect(services.db.prepare('SELECT max(version) AS version FROM vl_schema_migrations').get()).toEqual({ version: 6 });
     services.db.close();
     expect(services.db.open).toBe(false);
   });

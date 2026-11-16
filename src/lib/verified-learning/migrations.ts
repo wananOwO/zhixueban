@@ -4,7 +4,62 @@ import { LearningError } from './contracts';
 
 import { SCHEMA_V3 } from './backend-schema';
 
-export const CURRENT_SCHEMA_VERSION = 5;
+export const CURRENT_SCHEMA_VERSION = 6;
+
+/** v6：来源快照的派生检索块、向量和可恢复索引任务。 */
+const SCHEMA_V6 = `
+CREATE TABLE vl_retrieval_chunks (
+ scope_id TEXT NOT NULL,
+ book_id TEXT NOT NULL,
+ source_revision TEXT NOT NULL,
+ chapter_id TEXT NOT NULL,
+ paragraph_index INTEGER NOT NULL CHECK (typeof(paragraph_index) = 'integer' AND paragraph_index >= 0),
+ part_index INTEGER NOT NULL CHECK (typeof(part_index) = 'integer' AND part_index >= 0),
+ text TEXT NOT NULL,
+ content_hash TEXT NOT NULL,
+ preprocess_version TEXT NOT NULL,
+ PRIMARY KEY (scope_id, book_id, source_revision, chapter_id, paragraph_index, part_index),
+ FOREIGN KEY (scope_id, book_id, source_revision) REFERENCES vl_source_revisions(scope_id, book_id, source_revision)
+);
+CREATE INDEX vl_retrieval_chunk_scope_revision ON vl_retrieval_chunks(scope_id, book_id, source_revision);
+CREATE TABLE vl_retrieval_vectors (
+ scope_id TEXT NOT NULL,
+ book_id TEXT NOT NULL,
+ source_revision TEXT NOT NULL,
+ chapter_id TEXT NOT NULL,
+ paragraph_index INTEGER NOT NULL,
+ part_index INTEGER NOT NULL,
+ profile_id TEXT NOT NULL,
+ dimensions INTEGER NOT NULL CHECK (typeof(dimensions) = 'integer' AND dimensions > 0),
+ vector_blob BLOB,
+ status TEXT NOT NULL CHECK (status IN ('pending','ready','failed','stale')),
+ error_code TEXT,
+ updated_at TEXT NOT NULL,
+ CHECK (status <> 'ready' OR (vector_blob IS NOT NULL AND length(vector_blob) = dimensions * 4)),
+ PRIMARY KEY (scope_id, book_id, source_revision, chapter_id, paragraph_index, part_index, profile_id),
+ FOREIGN KEY (scope_id, book_id, source_revision, chapter_id, paragraph_index, part_index)
+   REFERENCES vl_retrieval_chunks(scope_id, book_id, source_revision, chapter_id, paragraph_index, part_index)
+);
+CREATE INDEX vl_retrieval_vector_ready ON vl_retrieval_vectors(scope_id, book_id, source_revision, profile_id, status);
+CREATE TABLE vl_index_jobs (
+ scope_id TEXT NOT NULL,
+ job_id TEXT NOT NULL,
+ book_id TEXT NOT NULL,
+ source_revision TEXT NOT NULL,
+ profile_id TEXT NOT NULL,
+ status TEXT NOT NULL CHECK (status IN ('queued','running','waiting_user','succeeded','failed','cancelled')),
+ lease_token TEXT,
+ lease_until TEXT,
+ progress_json TEXT NOT NULL CHECK (json_valid(progress_json)),
+ error_code TEXT,
+ created_at TEXT NOT NULL,
+ updated_at TEXT NOT NULL,
+ PRIMARY KEY (scope_id, job_id),
+ FOREIGN KEY (scope_id, book_id, source_revision) REFERENCES vl_source_revisions(scope_id, book_id, source_revision)
+);
+CREATE UNIQUE INDEX vl_index_job_active ON vl_index_jobs(scope_id, book_id, source_revision, profile_id)
+ WHERE status IN ('queued','running','waiting_user');
+`;
 
 /** v5：线上模式的浏览器空间登记与每日生成计数；本地模式不使用。 */
 const SCHEMA_V5 = `
@@ -160,7 +215,7 @@ export async function migrateVerifiedLearning(db: Database.Database): Promise<vo
     // 等待备份期间其他连接可能已经迁移，取得写锁后重新核验。
     const version = getSchemaVersion(db);
     for (let next = version + 1; next <= CURRENT_SCHEMA_VERSION; next++) {
-      db.exec([SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4, SCHEMA_V5][next - 1]);
+      db.exec([SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4, SCHEMA_V5, SCHEMA_V6][next - 1]);
       db.prepare('INSERT INTO vl_schema_migrations(version, applied_at) VALUES (?, ?)').run(next, new Date().toISOString());
     }
   }).immediate();

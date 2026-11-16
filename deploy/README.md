@@ -32,7 +32,7 @@ sudo -u zhixueban git clone <仓库地址> .
 sudo -u zhixueban pnpm install --frozen-lockfile
 sudo -u zhixueban pnpm build
 sudo -u zhixueban mkdir -p data/sample
-# 新建数据库（schema v5）
+# 新建数据库（schema v6）
 sudo -u zhixueban pnpm vl:init --db data/app.db --create
 ```
 

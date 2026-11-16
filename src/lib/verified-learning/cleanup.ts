@@ -13,7 +13,7 @@ const SCOPED_TABLES = [
   'vl_study_cursors', 'vl_notes', 'vl_learning_events', 'vl_study_sessions',
   'vl_course_reviews', 'vl_course_versions',
   'vl_drafts', 'vl_templates', 'vl_requests', 'vl_legacy_study',
-  'vl_deletions', 'vl_source_revisions', 'vl_books',
+  'vl_deletions', 'vl_index_jobs', 'vl_retrieval_vectors', 'vl_retrieval_chunks', 'vl_source_revisions', 'vl_books',
   'vl_web_sessions',
 ];
 
