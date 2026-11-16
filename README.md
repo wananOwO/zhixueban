@@ -26,22 +26,33 @@ pnpm install
 # 2. 新建本机数据库
 pnpm vl:init --db data/app.db --create
 
-# 3. 生成访问口令并启动（只监听 127.0.0.1:3101）
-$env:VERIFIED_LEARNING_LOCAL = '1'
-$env:VERIFIED_LEARNING_ACCESS_TOKEN = node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))"
-$env:DB_PATH = 'data/app.db'
-Write-Output "访问口令：$env:VERIFIED_LEARNING_ACCESS_TOKEN"
+# 3. 构建并启动（默认免登录，只监听 127.0.0.1:3101）
 pnpm build
-pnpm start -- --hostname 127.0.0.1 --port 3101
+pnpm start
 ```
 
-打开 http://127.0.0.1:3101 ，输入上面打印的访问口令。进入「设置」填写模型供应商、API Key 和模型名，然后：
+打开 http://127.0.0.1:3101 ，默认直接进入应用。进入「设置」填写模型供应商、API Key 和模型名，然后：
 
 1. 在「教材库」上传一本教材。
 2. 在「课程草稿」写下学习目标，选章节，点「生成课程方案」。
 3. 生成完成后审核路线图，确认后开始学习。
 
-Linux 或 macOS 上把第 3 步换成 `export VERIFIED_LEARNING_LOCAL=1` 等写法即可。开发时可以用 `pwsh scripts/dev-local.ps1` 在后台启动 `next dev`，口令写在 `%TEMP%\vl-dev-token.txt`。
+开发时运行 `pnpm dev`；Windows 也可以用 `pwsh scripts/dev-local.ps1` 在后台启动。两种启动方式均读取项目根目录 `.env.local`，不会每次生成新密码。
+
+### 可选：开启本机固定密码
+
+默认不需要配置认证。需要密码时，在项目根目录的 `.env.local` 添加：
+
+```dotenv
+VL_LOCAL_AUTH=1
+VL_LOCAL_PASSWORD="你自己设置的固定密码"
+# 可选：使用其他已初始化数据库
+DB_PATH=data/app.db
+```
+
+修改后重启服务，无需重新构建。关闭密码设为 `VL_LOCAL_AUTH=0`；开启后密码为空、全空白或超过 128 字符会明确报错，不会自动放行。密码精确匹配，包含 `$` 时在配置中写为 `\$`。`.env.local` 已被 Git 忽略，不要把密码写进 `NEXT_PUBLIC_*` 变量。
+
+本地免登录仍保留 Host、Origin 与跨站请求校验，但这台电脑上能访问服务的用户都能操作数据。不要把免登录的本机服务通过代理暴露到公网；公网部署继续使用下方的线上访问码模式。旧的 `VERIFIED_LEARNING_LOCAL`、`VERIFIED_LEARNING_ACCESS_TOKEN` 已不再使用。
 
 **编程题（可选）**：需要 Judge0。Judge0 只能在 Linux 上运行，部署方法见 `deploy/README.md`。设置环境变量 `JUDGE0_URL`（以及 `JUDGE0_TOKEN`）后，设置页会显示可用语言（Python、JavaScript、C）。没有 Judge0 时只是不生成编程题，选择题和填空题不受影响；程序不会在主机上直接执行学生代码。
 

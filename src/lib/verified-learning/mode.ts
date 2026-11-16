@@ -1,8 +1,9 @@
 import { AppError } from './errors';
+import { readLocalConfig } from './local-access';
 
 /**
  * 运行模式：同一份代码，环境变量切换（规格 8.4）。
- * - local（默认）：仅 127.0.0.1:3101，终端口令登录，固定 local-owner 空间。
+ * - local（默认）：仅 127.0.0.1:3101，默认免登录，可配置固定密码，固定 local-owner 空间。
  * - online：公网域名 + 访问码，每个浏览器一个独立空间，模型 Key 只在浏览器与服务器内存。
  */
 export type VlMode = 'local' | 'online';
@@ -46,6 +47,6 @@ export function isOnline(env: Record<string, string | undefined> = process.env):
 export function modeView(env: Record<string, string | undefined> = process.env) {
   const { mode } = readMode(env);
   return mode === 'online'
-    ? { mode, uploadLimitBytes: ONLINE_LIMITS.uploadBytes, booksPerSpace: ONLINE_LIMITS.booksPerSpace }
-    : { mode, uploadLimitBytes: LOCAL_UPLOAD_BYTES, booksPerSpace: null };
+    ? { mode, authRequired: true, uploadLimitBytes: ONLINE_LIMITS.uploadBytes, booksPerSpace: ONLINE_LIMITS.booksPerSpace }
+    : { mode, authRequired: readLocalConfig(env).authRequired, uploadLimitBytes: LOCAL_UPLOAD_BYTES, booksPerSpace: null };
 }

@@ -8,7 +8,7 @@ import { Field, Input } from '@/components/ui/field';
 import { BlockError } from '@/components/states/block-states';
 import { Seal } from './brand';
 
-/** 登录页：本地模式输入终端口令；线上模式输入访问码 */
+/** 登录页：本地按配置输入固定密码；线上模式输入访问码 */
 export function LoginForm({ onSuccess }: { onSuccess: () => void }) {
   const mode = useMode();
   const online = mode.data?.mode === 'online';
@@ -22,12 +22,12 @@ export function LoginForm({ onSuccess }: { onSuccess: () => void }) {
     setBusy(true);
     setError(null);
     try {
-      await api('/access', { method: 'POST', body: { token: secret.trim() } });
+      await api('/access', { method: 'POST', body: { token: online ? secret.trim() : secret } });
       setSecret('');
       onSuccess();
     } catch (e) {
       setError(e instanceof ApiError && e.status === 401
-        ? new Error(online ? '访问码不正确。' : '口令不正确，请输入启动服务时终端生成的 VERIFIED_LEARNING_ACCESS_TOKEN。')
+        ? new Error(online ? '访问码不正确。' : '密码不正确，请输入 .env.local 中配置的 VL_LOCAL_PASSWORD。')
         : e);
     } finally {
       setBusy(false);
@@ -66,10 +66,10 @@ export function LoginForm({ onSuccess }: { onSuccess: () => void }) {
           <div>
             <h1 className="font-serif text-h2 font-bold">{online ? '输入访问码' : '本机登录'}</h1>
             <p className="mt-1 text-base text-muted">
-              {online ? '访问码随评审材料提供。登录后会为这个浏览器建立独立的学习空间。' : '输入启动服务时终端生成的访问口令。'}
+              {online ? '访问码随评审材料提供。登录后会为这个浏览器建立独立的学习空间。' : '输入 .env.local 中 VL_LOCAL_PASSWORD 配置的固定密码。'}
             </p>
           </div>
-          <Field label={online ? '访问码' : '访问口令'} htmlFor="secret">
+          <Field label={online ? '访问码' : '本机密码'} htmlFor="secret">
             <Input
               id="secret"
               type="password"

@@ -10,7 +10,13 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/field';
 import { BlockError } from '@/components/states/block-states';
 import { GradeMark } from '@/components/zhupi/grade-mark';
-import { CodeEditor } from './code-editor';
+import dynamic from 'next/dynamic';
+
+// 课件与普通题不加载 CodeMirror；只有实际显示编程输入区时才下载。
+const CodeEditor = dynamic(() => import('./code-editor').then(module => module.CodeEditor), {
+  ssr: false,
+  loading: () => <div role="status" className="min-h-40 rounded-[var(--radius-control)] bg-raised"><span className="sr-only">正在加载代码编辑器</span></div>,
+});
 
 type Question = RunQuestion & { answer?: string; explanation?: string };
 const TYPE_LABEL: Record<Question['type'], string> = { choice: '选择题', fill: '填空题', code: '编程题' };

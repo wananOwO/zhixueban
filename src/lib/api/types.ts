@@ -277,6 +277,7 @@ export interface ProgressView {
 }
 export interface ModeView {
   mode: 'local' | 'online';
+  authRequired?: boolean;
   uploadLimitBytes: number;
   booksPerSpace: number | null;
 }

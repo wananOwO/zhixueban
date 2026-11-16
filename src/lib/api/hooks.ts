@@ -3,17 +3,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { api, newKey } from './client';
-import { queryKeys } from './queries';
-import type { BookView, CourseListItem, DeletionImpact, FormDraft, HistoryRunDetail, HistoryRunItem, JobView, NoteView, ProgressView, SessionView } from './types';
+import { listQueries, queryKeys } from './queries';
+import type { BookView, DeletionImpact, FormDraft, HistoryRunDetail, HistoryRunItem, JobView, NoteView, ProgressView, SessionView } from './types';
 
 const RUNNING = new Set(['queued', 'running']);
 export const isRunning = (job: JobView) => RUNNING.has(job.status);
 
 export function useBooks(q = '', archived = false) {
-  return useQuery({
-    queryKey: queryKeys.books(q, archived),
-    queryFn: () => api<BookView[]>(`/textbooks?${new URLSearchParams({ q, archived: String(archived) })}`),
-  });
+  return useQuery(listQueries.books(q, archived));
 }
 
 export function useBook(id: string | undefined) {
@@ -26,18 +23,17 @@ export function useBookUsage(id: string | undefined) {
 }
 
 export function useCourses() {
-  return useQuery({ queryKey: queryKeys.courses(), queryFn: () => api<CourseListItem[]>('/courses') });
+  return useQuery(listQueries.courses());
 }
 
 export function useDrafts() {
-  return useQuery({ queryKey: queryKeys.drafts(), queryFn: () => api<FormDraft[]>('/drafts') });
+  return useQuery(listQueries.drafts());
 }
 
 /** 最近任务；有进行中的任务时每 2 秒刷新 */
 export function useJobs() {
   return useQuery({
-    queryKey: queryKeys.jobs(),
-    queryFn: () => api<JobView[]>('/jobs'),
+    ...listQueries.jobs(),
     refetchInterval: query => (query.state.data?.some(isRunning) ? 2000 : false),
   });
 }

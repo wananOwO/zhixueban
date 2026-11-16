@@ -1,5 +1,6 @@
 import { AccessGate } from '@/components/shell/access-gate';
 import { TopBar } from '@/components/shell/top-bar';
+import { RouteTransition } from '@/components/shell/route-transition';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -12,7 +13,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </a>
       <AccessGate>
         <TopBar />
-        <main id="main" className="px-6 pb-16 max-md:px-4">{children}</main>
+        <main id="main" className="px-6 pb-16 max-md:px-4"><RouteTransition>{children}</RouteTransition></main>
       </AccessGate>
     </>
   );

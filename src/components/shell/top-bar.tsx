@@ -2,6 +2,9 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
+import { prefetchNavigation } from '@/lib/api/navigation-prefetch';
+import { useMode } from '@/lib/api/queries';
 import { Dialog as D } from 'radix-ui';
 import { LogOut, Menu, X } from 'lucide-react';
 import { useState } from 'react';
@@ -19,6 +22,10 @@ async function logout() {
 /** 顶栏：标志、五项导航、模型 Key 状态；手机端导航收进全屏菜单 */
 export function TopBar() {
   const pathname = usePathname();
+  const client = useQueryClient();
+  const mode = useMode();
+  const authRequired = mode.data?.mode === 'online' || mode.data?.authRequired !== false;
+  const warm = (href: string) => { void prefetchNavigation(client, href); };
   const [open, setOpen] = useState(false);
   return (
     <header className="flex h-14 items-center gap-8 px-6 max-md:gap-3 max-md:px-4">
@@ -28,6 +35,10 @@ export function TopBar() {
           <Link
             key={item.href}
             href={item.href}
+            prefetch={true}
+            onMouseEnter={() => warm(item.href)}
+            onFocus={() => warm(item.href)}
+            onTouchStart={() => warm(item.href)}
             aria-current={isActive(pathname, item.href) ? 'page' : undefined}
             className="transition-colors hover:text-ink aria-[current=page]:text-ink"
           >
@@ -37,10 +48,10 @@ export function TopBar() {
       </nav>
       <div className="ml-auto flex items-center gap-3 text-muted">
         <span className="max-md:hidden"><ModelKeyStatus /></span>
-        <Button variant="ghost" size="sm" className="max-md:hidden" onClick={() => void logout()}>
+        {authRequired && <Button variant="ghost" size="sm" className="max-md:hidden" onClick={() => void logout()}>
           <LogOut aria-hidden />
           退出
-        </Button>
+        </Button>}
         <D.Root open={open} onOpenChange={setOpen}>
           <D.Trigger asChild>
             <Button size="icon" className="md:hidden" aria-label="打开菜单"><Menu aria-hidden /></Button>
@@ -59,6 +70,10 @@ export function TopBar() {
                   <Link
                     key={item.href}
                     href={item.href}
+                    prefetch={true}
+                    onMouseEnter={() => warm(item.href)}
+                    onFocus={() => warm(item.href)}
+                    onTouchStart={() => warm(item.href)}
                     onClick={() => setOpen(false)}
                     aria-current={isActive(pathname, item.href) ? 'page' : undefined}
                     className={cn('flex h-12 items-center border-b border-line font-serif text-h3 text-ink-soft', 'aria-[current=page]:text-zhu')}
@@ -69,10 +84,10 @@ export function TopBar() {
               </nav>
               <div className="mt-6 flex items-center justify-between text-muted">
                 <ModelKeyStatus />
-                <Button variant="ghost" size="sm" onClick={() => { setOpen(false); void logout(); }}>
+                {authRequired && <Button variant="ghost" size="sm" onClick={() => { setOpen(false); void logout(); }}>
                   <LogOut aria-hidden />
                   退出
-                </Button>
+                </Button>}
               </div>
             </D.Content>
           </D.Portal>

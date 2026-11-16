@@ -1,8 +1,8 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { queryOptions, useQuery } from '@tanstack/react-query';
 import { api, ApiError } from './client';
-import type { ModeView } from './types';
+import type { BookView, CourseListItem, FormDraft, JobView, ModeView, SettingsView } from './types';
 
 /** TanStack Query 键：同一资源在各页面共用缓存 */
 export const queryKeys = {
@@ -30,7 +30,32 @@ export const queryKeys = {
   judge: () => ['judge'] as const,
 };
 
-const LOCAL_MODE: ModeView = { mode: 'local', uploadLimitBytes: 50 * 1024 * 1024, booksPerSpace: null };
+/** 页面与意图预热共用选项，保持新鲜期、请求和取消行为一致。 */
+export const listQueries = {
+  books: (q = '', archived = false) => queryOptions({
+    queryKey: queryKeys.books(q, archived),
+    staleTime: 5_000,
+    queryFn: ({ signal }) => api<BookView[]>(`/textbooks?${new URLSearchParams({ q, archived: String(archived) })}`, { signal }),
+  }),
+  courses: () => queryOptions({
+    queryKey: queryKeys.courses(), staleTime: 5_000,
+    queryFn: ({ signal }) => api<CourseListItem[]>('/courses', { signal }),
+  }),
+  drafts: () => queryOptions({
+    queryKey: queryKeys.drafts(), staleTime: 5_000,
+    queryFn: ({ signal }) => api<FormDraft[]>('/drafts', { signal }),
+  }),
+  jobs: () => queryOptions({
+    queryKey: queryKeys.jobs(), staleTime: 5_000,
+    queryFn: ({ signal }) => api<JobView[]>('/jobs', { signal }),
+  }),
+  settings: () => queryOptions({
+    queryKey: queryKeys.settings(), staleTime: 5_000,
+    queryFn: ({ signal }) => api<SettingsView>('/settings', { signal }),
+  }),
+};
+
+const LOCAL_MODE: ModeView = { mode: 'local', authRequired: true, uploadLimitBytes: 50 * 1024 * 1024, booksPerSpace: null };
 
 /** 运行模式：旧服务没有 /mode 时按本地模式处理 */
 export function useMode() {

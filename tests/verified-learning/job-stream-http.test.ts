@@ -23,9 +23,9 @@ describe('任务流与轨迹路由', () => {
     mkdirSync(path.join(root, 'data'));
     vi.spyOn(process, 'cwd').mockReturnValue(root);
     vi.stubEnv('DB_PATH', path.join(root, 'data/app.db'));
-    vi.stubEnv('VERIFIED_LEARNING_LOCAL', '1');
+    vi.stubEnv('VL_LOCAL_AUTH', '1');
     const secret = randomBytes(32).toString('base64url');
-    vi.stubEnv('VERIFIED_LEARNING_ACCESS_TOKEN', secret);
+    vi.stubEnv('VL_LOCAL_PASSWORD', secret);
     await initializeVerifiedLearning('data/app.db', true, root);
     const login = await POST(request('POST', ['access'], undefined, {}, { token: secret }), context(['access']));
     const cookie = login.headers.get('set-cookie')!.split(';')[0];

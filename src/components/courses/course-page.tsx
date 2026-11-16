@@ -1,8 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowRight } from 'lucide-react';
 import { useBooks, useCourses, useDrafts, useHistory, useProgress, useSession } from '@/lib/api/hooks';
 import { useCourseTrace } from '@/lib/api/use-course-trace';
@@ -34,21 +33,23 @@ const TABS = [
 type Tab = (typeof TABS)[number][0];
 
 /** 课程主页：先修路线图为主体，下方下一步 / 最近活动 / 资料来源；其余视图放在标签页 */
-export function CoursePage({ courseId, initialTab, versionId }: { courseId: string; initialTab?: string; versionId?: string }) {
-  const router = useRouter();
+export function CoursePage({ courseId }: { courseId: string }) {
+  const searchParams = useSearchParams();
+  const versionId = searchParams.get('versionId');
   const courses = useCourses();
   const drafts = useDrafts();
   const versions = courses.data?.filter(c => c.courseId === courseId) ?? [];
   // 缺省取当前版本（active），没有则取最新一版
   const course = versions.find(c => c.versionId === versionId) ?? versions.find(c => c.status === 'active') ?? versions[0];
-  const [tab, setTab] = useState<Tab>(TABS.some(([id]) => id === initialTab) ? (initialTab as Tab) : 'roadmap');
+  const requestedTab = searchParams.get('tab');
+  const tab: Tab = TABS.some(([id]) => id === requestedTab) ? requestedTab as Tab : 'roadmap';
 
   const changeTab = (value: string) => {
-    setTab(value as Tab);
     const params = new URLSearchParams(window.location.search);
     if (value === 'roadmap') params.delete('tab'); else params.set('tab', value);
     const query = params.toString();
-    router.replace(`/courses/${encodeURIComponent(courseId)}${query ? `?${query}` : ''}`, { scroll: false });
+    // 只改变本地视图，不触发 RSC 往返；保留版本、其他参数与当前锚点。
+    window.history.replaceState(null, '', `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`);
   };
 
   if (courses.isPending) return <><PageHeader crumbs={[{ href: '/courses', label: '我的课程' }]} title="课程" /><Panel className="mt-6"><BlockLoading lines={8} label="正在读取课程" /></Panel></>;

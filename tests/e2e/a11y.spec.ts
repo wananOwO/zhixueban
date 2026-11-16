@@ -122,7 +122,7 @@ test.describe('无障碍', () => {
     await expect(page.locator('h1')).toHaveCount(1);
     expect(await scan(page)).toEqual([]);
     const focused = await tabThrough(page, 10);
-    expect(focused.some(f => /口令|访问码|登录/.test(f.name))).toBe(true);
+    expect(focused.some(f => /密码|访问码|登录/.test(f.name))).toBe(true);
     expect(focused.filter(f => !f.visible)).toEqual([]);
   });
 

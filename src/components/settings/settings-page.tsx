@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useId, useState } from 'react';
 import { Loader2, RefreshCw } from 'lucide-react';
 import { ApiError, api } from '@/lib/api/client';
-import { queryKeys, useMode } from '@/lib/api/queries';
+import { listQueries, queryKeys, useMode } from '@/lib/api/queries';
 import { useModelKey, type BrowserModelConfig } from '@/lib/stores/model-key';
 import type { SettingsView } from '@/lib/api/types';
 import { Button } from '@/components/ui/button';
@@ -62,7 +62,7 @@ function Section({ title, description, children, labelledBy }: { title: string; 
 
 function LocalForm() {
   const client = useQueryClient();
-  const settings = useQuery({ queryKey: queryKeys.settings(), queryFn: () => api<SettingsView>('/settings') });
+  const settings = useQuery(listQueries.settings());
   const [form, setForm] = useState<Form>(EMPTY);
   const [message, setMessage] = useState('');
   useEffect(() => {
@@ -117,7 +117,7 @@ function LocalForm() {
 /** 本地模式：本机 Obsidian vault 路径。笔记「写入 Obsidian」时写到 <vault>/智学伴/<课程>/ 下 */
 function ObsidianForm() {
   const client = useQueryClient();
-  const settings = useQuery({ queryKey: queryKeys.settings(), queryFn: () => api<SettingsView>('/settings') });
+  const settings = useQuery(listQueries.settings());
   const [vault, setVault] = useState('');
   const [message, setMessage] = useState('');
   useEffect(() => { if (settings.data) setVault(String(settings.data.obsidian_vault_path ?? '')); }, [settings.data]);

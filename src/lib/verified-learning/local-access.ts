@@ -8,7 +8,7 @@ const COOKIE = 'vl_session';
 const SESSION_MS = 8 * 60 * 60 * 1000;
 const tokenPattern = /^[A-Za-z0-9_-]{43}$/;
 let failures = { fingerprint: '', start: 0, count: 0 };
-export interface LocalConfig { tokenHash: Buffer; fingerprint: string }
+export type LocalConfig = { authRequired: false } | { authRequired: true; tokenHash: Buffer; fingerprint: string };
 
 function hash(value: string): Buffer {
   return createHash('sha256').update(value).digest();
@@ -27,12 +27,14 @@ function timestamp(now: Date): number {
 }
 
 export function readLocalConfig(env: Record<string, string | undefined> = process.env): LocalConfig {
-  const secret = env.VERIFIED_LEARNING_ACCESS_TOKEN;
-  if (env.VERIFIED_LEARNING_LOCAL !== '1' || !validToken(secret)) {
-    throw new AppError('DISABLED', '本机学习入口尚未启用');
+  const enabled = env.VL_LOCAL_AUTH;
+  if (enabled === undefined || enabled === '' || enabled === '0') return { authRequired: false };
+  if (enabled !== '1') throw new AppError('DISABLED', 'VL_LOCAL_AUTH 只能配置为 0 或 1');
+  const secret = env.VL_LOCAL_PASSWORD;
+  if (!secret?.trim() || secret.length > 128) {
+    throw new AppError('DISABLED', '启用本机登录时，必须在 .env.local 配置 1–128 字符的 VL_LOCAL_PASSWORD');
   }
-  const tokenHash = hash(secret);
-  return { tokenHash, fingerprint: hash(`local-v1:${secret}`).toString('hex') };
+  return { authRequired: true, tokenHash: hash(secret), fingerprint: hash(`local-password-v1:${secret}`).toString('hex') };
 }
 
 export function assertLocalRequest(request: Request): void {
@@ -66,6 +68,7 @@ export function login(db: Database.Database, request: Request, token: unknown, n
   const config = readLocalConfig();
   assertLocalRequest(request);
   if (request.method !== 'POST') throw new AppError('FORBIDDEN', '登录需要明确提交');
+  if (!config.authRequired) throw new AppError('FORBIDDEN', '本机免登录模式无需提交密码');
   const time = timestamp(now);
   if (failures.fingerprint !== config.fingerprint || time >= failures.start + 60_000) {
     failures = { fingerprint: config.fingerprint, start: time, count: 0 };
@@ -93,6 +96,8 @@ export function requireLocalAccess(db: Database.Database, request: Request, now 
   const config = readLocalConfig();
   assertLocalRequest(request);
   timestamp(now);
+  // 免登录只免除会话验证，不绕过上面的本机同源边界。
+  if (!config.authRequired) return { scopeId: 'local-owner' };
   const token = sessionToken(request);
   if (!token) reject();
   const row = db.prepare(`SELECT scope_id FROM vl_web_sessions

@@ -63,7 +63,7 @@ describe('线上模式访问码登录与浏览器空间', () => {
     await setup();
     const response = await GET(request('GET', ['mode'], { origin: null }), context(['mode']));
     expect(response.status).toBe(200);
-    expect((await response.json()).data).toEqual({ mode: 'online', uploadLimitBytes: 20 * 1024 * 1024, booksPerSpace: 10 });
+    expect((await response.json()).data).toEqual({ mode: 'online', authRequired: true, uploadLimitBytes: 20 * 1024 * 1024, booksPerSpace: 10 });
   });
 
   it('访问码错误返回 401；同一 IP 第 6 次尝试返回 429', async () => {
@@ -134,10 +134,10 @@ describe('线上模式访问码登录与浏览器空间', () => {
   it('本地模式下 /mode 返回 local，原有本机访问不受影响', async () => {
     await setup();
     vi.stubEnv('VL_MODE', '');
-    vi.stubEnv('VERIFIED_LEARNING_LOCAL', '1');
-    vi.stubEnv('VERIFIED_LEARNING_ACCESS_TOKEN', 'a'.repeat(43));
+    vi.stubEnv('VL_LOCAL_AUTH', '1');
+    vi.stubEnv('VL_LOCAL_PASSWORD', 'a'.repeat(43));
     const local = new Request('http://127.0.0.1:3101/api/verified-learning/v1/mode', { headers: { host: '127.0.0.1:3101' } });
     const response = await GET(local, context(['mode']));
-    expect((await response.json()).data).toEqual({ mode: 'local', uploadLimitBytes: 50 * 1024 * 1024, booksPerSpace: null });
+    expect((await response.json()).data).toEqual({ mode: 'local', authRequired: true, uploadLimitBytes: 50 * 1024 * 1024, booksPerSpace: null });
   });
 });

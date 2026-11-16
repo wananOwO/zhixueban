@@ -29,7 +29,7 @@ async function boot(online: boolean) {
     vi.stubEnv('VL_MODE', 'online'); vi.stubEnv('VL_PUBLIC_ORIGIN', origin); vi.stubEnv('VL_ACCESS_CODE', token);
   } else {
     token = randomBytes(32).toString('base64url');
-    vi.stubEnv('VERIFIED_LEARNING_LOCAL', '1'); vi.stubEnv('VERIFIED_LEARNING_ACCESS_TOKEN', token);
+    vi.stubEnv('VL_LOCAL_AUTH', '1'); vi.stubEnv('VL_LOCAL_PASSWORD', token);
   }
   await initializeVerifiedLearning('data/app.db', true, root);
   let cookie = '';

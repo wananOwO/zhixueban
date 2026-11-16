@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { readdirSync, readFileSync } from 'node:fs';
 import { baseRoutes, book, mockApi } from './mock-api';
 
 const points = [
@@ -91,6 +92,16 @@ async function openLesson(page: Page, extra: Record<string, Parameters<typeof mo
 }
 
 test.describe('学习页', () => {
+  test('只读课件不下载编程编辑器专用代码块', async ({ page }) => {
+    const editorChunks = readdirSync('.next/static/chunks').filter(file => file.endsWith('.js') && readFileSync(`.next/static/chunks/${file}`, 'utf8').includes('cm-editor'));
+    expect(editorChunks.length).toBeGreaterThan(0);
+    const downloaded: string[] = [];
+    page.on('request', request => { downloaded.push(new URL(request.url()).pathname.split('/').at(-1)!); });
+    await openLesson(page);
+    await expect(page.getByRole('article').locator('.cited').first()).toBeVisible();
+    expect(downloaded.filter(file => editorChunks.includes(file))).toEqual([]);
+  });
+
   test('课件：宋体正文、朱批旁注；点旁注打开原文并定位第 761 段', async ({ page }) => {
     await openLesson(page);
     await expect(page.getByRole('heading', { level: 1, name: '运行程序与 print()' })).toBeVisible();

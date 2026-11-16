@@ -19,22 +19,56 @@ async function setup() {
 }
 beforeEach(() => {
   secret = randomBytes(32).toString('base64url');
-  vi.stubEnv('VERIFIED_LEARNING_LOCAL', '1');
-  vi.stubEnv('VERIFIED_LEARNING_ACCESS_TOKEN', secret);
+  vi.stubEnv('VL_LOCAL_AUTH', '1');
+  vi.stubEnv('VL_LOCAL_PASSWORD', secret);
 });
 afterEach(() => vi.unstubAllEnvs());
 
 describe('本机访问边界', () => {
-  it('默认关闭或口令配置不合法时在访问数据库之前拒绝', () => {
-    expect(() => readLocalConfig({})).toThrow(expect.objectContaining({ code: 'DISABLED' }));
-    for (const value of ['', 'short', 'a'.repeat(43) + '!', 'a'.repeat(100)]) {
-      expect(() => readLocalConfig({ VERIFIED_LEARNING_LOCAL: '1', VERIFIED_LEARNING_ACCESS_TOKEN: value }))
+  it('本地默认免登录，忽略旧随机口令，不创建会话', async () => {
+    expect(readLocalConfig({})).toEqual({ authRequired: false });
+    expect(readLocalConfig({ VL_LOCAL_AUTH: '0', VL_LOCAL_PASSWORD: '未启用的密码' })).toEqual({ authRequired: false });
+    expect(readLocalConfig({ VERIFIED_LEARNING_LOCAL: '1', VERIFIED_LEARNING_ACCESS_TOKEN: secret })).toEqual({ authRequired: false });
+    vi.stubEnv('VL_LOCAL_AUTH', '0');
+    const db = await setup();
+    expect(requireLocalAccess(db, request(), now)).toEqual({ scopeId: 'local-owner' });
+    expect(requireLocalAccess(db, request('GET', undefined, { 'x-scope-id': 'victim' }), now)).toEqual({ scopeId: 'local-owner' });
+    expect(db.prepare('SELECT count(*) AS n FROM vl_web_sessions').get()).toEqual({ n: 0 });
+  });
+
+  it('错误开关或启用后空密码在访问数据库之前拒绝', () => {
+    for (const value of ['', ' ', 'a'.repeat(129)]) {
+      expect(() => readLocalConfig({ VL_LOCAL_AUTH: '1', VL_LOCAL_PASSWORD: value }))
+        .toThrow(expect.objectContaining({ code: 'DISABLED' }));
+    }
+    for (const value of ['true', 'yes', '2', ' ']) {
+      expect(() => readLocalConfig({ VL_LOCAL_AUTH: value, VL_LOCAL_PASSWORD: secret }))
         .toThrow(expect.objectContaining({ code: 'DISABLED' }));
     }
     const db = openTestDb();
     db.close();
-    vi.stubEnv('VERIFIED_LEARNING_LOCAL', '0');
+    vi.stubEnv('VL_LOCAL_PASSWORD', '');
     expect(() => requireLocalAccess(db, request(), now)).toThrow(expect.objectContaining({ code: 'DISABLED' }));
+  });
+
+  it('免登录也拒绝跨站、错误Host和无Origin的写请求', async () => {
+    vi.stubEnv('VL_LOCAL_AUTH', '0');
+    const db = await setup();
+    for (const req of [request('POST', undefined, { origin: '' }), request('GET', undefined, { host: 'evil.example' }), request('GET', undefined, { origin: 'http://evil.example' }), request('GET', undefined, { 'sec-fetch-site': 'cross-site' })]) {
+      expect(() => requireLocalAccess(db, req, now)).toThrow(expect.objectContaining({ code: 'FORBIDDEN' }));
+    }
+  });
+
+  it('固定密码允许中文与空格，重复读取配置不改变已有会话，精确匹配', async () => {
+    vi.stubEnv('VL_LOCAL_PASSWORD', ' 我的本机密码 ');
+    const db = await setup();
+    const signed = login(db, request('POST'), ' 我的本机密码 ', now);
+    const first = readLocalConfig();
+    expect(readLocalConfig()).toEqual(first);
+    expect(requireLocalAccess(db, request('GET', signed.cookie), now)).toEqual({ scopeId: 'local-owner' });
+    expect(() => login(db, request('POST'), '我的本机密码', now)).toThrow(expect.objectContaining({ code: 'UNAUTHENTICATED' }));
+    vi.stubEnv('VL_LOCAL_PASSWORD', 'changed');
+    expect(() => requireLocalAccess(db, request('GET', signed.cookie), now)).toThrow(expect.objectContaining({ code: 'UNAUTHENTICATED' }));
   });
 
   it('口令换取独立随机cookie，数据库只存哈希，不接收客户端scope', async () => {
@@ -73,7 +107,7 @@ describe('本机访问边界', () => {
     expect(clear).toContain('Max-Age=0');
     expect(() => requireLocalAccess(db, request('GET', signed.cookie), now)).toThrow(expect.objectContaining({ code: 'UNAUTHENTICATED' }));
     const next = login(db, request('POST'), secret, now);
-    vi.stubEnv('VERIFIED_LEARNING_ACCESS_TOKEN', randomBytes(32).toString('base64url'));
+    vi.stubEnv('VL_LOCAL_PASSWORD', randomBytes(32).toString('base64url'));
     expect(() => requireLocalAccess(db, request('GET', next.cookie), now)).toThrow(expect.objectContaining({ code: 'UNAUTHENTICATED' }));
   });
 

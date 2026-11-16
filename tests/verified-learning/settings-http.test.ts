@@ -23,12 +23,12 @@ beforeEach(async () => {
   mkdirSync(path.join(root, 'data'));
   vi.spyOn(process, 'cwd').mockReturnValue(root);
   vi.stubEnv('DB_PATH', path.join(root, 'data/app.db'));
-  vi.stubEnv('VERIFIED_LEARNING_LOCAL', '1');
+  vi.stubEnv('VL_LOCAL_AUTH', '1');
   vi.stubEnv('LLM_MODEL', 'environment-model');
   vi.stubEnv('LLM_PROVIDER', 'openai-compatible');
   vi.stubEnv('LLM_API_KEY', 'environment-secret');
   const token = randomBytes(32).toString('base64url');
-  vi.stubEnv('VERIFIED_LEARNING_ACCESS_TOKEN', token);
+  vi.stubEnv('VL_LOCAL_PASSWORD', token);
   await initializeVerifiedLearning('data/app.db', true, root);
   const response = await POST(request('POST', { token }), context('access'));
   cookie = response.headers.get('set-cookie')!;
