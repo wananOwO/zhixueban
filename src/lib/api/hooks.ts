@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { api, newKey } from './client';
-import { listQueries, queryKeys } from './queries';
+import { listQueries, queryKeys, type RetrievalIndexStatusView } from './queries';
 import type { BookView, DeletionImpact, FormDraft, HistoryRunDetail, HistoryRunItem, JobView, NoteView, ProgressView, SessionView } from './types';
 
 const RUNNING = new Set(['queued', 'running']);
@@ -20,6 +20,34 @@ export function useBook(id: string | undefined) {
 /** 教材被哪些课程版本、草稿使用（删除前的影响预览） */
 export function useBookUsage(id: string | undefined) {
   return useQuery({ queryKey: queryKeys.bookUsage(id ?? ''), enabled: !!id, queryFn: () => api<DeletionImpact>(`/textbooks/${encodeURIComponent(id!)}/deletion`) });
+}
+
+/** 语义索引状态：进行中每 2 秒刷新，页面不可见时由 TanStack 自动暂停轮询 */
+export function useRetrievalIndex(id: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.retrievalIndex(id ?? ''), enabled: !!id,
+    refetchInterval: query => {
+      const status = (query.state.data as RetrievalIndexStatusView | undefined)?.status;
+      return status === 'running' || status === 'queued' ? 2_000 : false;
+    },
+    queryFn: () => api<RetrievalIndexStatusView>(`/textbooks/${encodeURIComponent(id!)}/retrieval-index`),
+  });
+}
+
+export function useStartRetrievalIndex(id: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: () => api(`/textbooks/${encodeURIComponent(id)}/retrieval-index`, { method: 'POST', body: { confirm: true }, key: newKey() }),
+    onSettled: () => { void client.invalidateQueries({ queryKey: queryKeys.retrievalIndex(id) }); },
+  });
+}
+
+export function useRetrievalIndexAction(id: string, action: 'cancel' | 'resume') {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (jobId: string) => api(`/retrieval-jobs/${encodeURIComponent(jobId)}/${action}`, { method: 'POST', body: {} }),
+    onSettled: () => { void client.invalidateQueries({ queryKey: queryKeys.retrievalIndex(id) }); },
+  });
 }
 
 export function useCourses() {

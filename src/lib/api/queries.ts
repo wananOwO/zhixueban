@@ -12,6 +12,7 @@ export const queryKeys = {
   booksAll: () => ['books'] as const,
   book: (id: string) => ['book', id] as const,
   bookUsage: (id: string) => ['book', id, 'usage'] as const,
+  retrievalIndex: (id: string) => ['book', id, 'retrieval-index'] as const,
   chapter: (bookId: string, chapterId: string, revision: string) => ['chapter', bookId, chapterId, revision] as const,
   drafts: () => ['drafts'] as const,
   draft: (id: string) => ['draft', id] as const,
@@ -28,6 +29,18 @@ export const queryKeys = {
   historyRun: (sessionId: string, runId: string) => ['history', sessionId, runId] as const,
   settings: () => ['settings'] as const,
   judge: () => ['judge'] as const,
+};
+
+export type RetrievalIndexStatusView = {
+  status: 'none' | 'queued' | 'running' | 'waiting_user' | 'succeeded' | 'failed' | 'cancelled';
+  profileId: string | null;
+  ready: number;
+  failed: number;
+  total: number;
+  jobId: string | null;
+  usable: boolean;
+  configured: boolean;
+  model: string | null;
 };
 
 /** 页面与意图预热共用选项，保持新鲜期、请求和取消行为一致。 */

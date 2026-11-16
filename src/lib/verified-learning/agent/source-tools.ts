@@ -1,20 +1,30 @@
 import { Type } from '@earendil-works/pi-ai';
 import type { AgentTool } from '@earendil-works/pi-agent-core';
 import type { SourceSnapshot } from '../sources';
+import type { RetrievalService } from '../retrieval/service';
 
 export function toolResult(data: unknown) {
   return { content: [{ type: 'text' as const, text: JSON.stringify(data) }], details: {} };
 }
 
+/** 注入统一检索服务后，search_sources 返回混合检索结果；服务出错时在工具内退回本地关键词 */
+export type SourceRetrieval = Pick<RetrievalService, 'retrieve'>;
+
 /** 引用必须来自工具返回的真实段落编号，不把数组下标当段落编号。 */
-export function createSourceTools(sources: SourceSnapshot[]): AgentTool<any>[] {
+export function createSourceTools(sources: SourceSnapshot[], retrieval?: SourceRetrieval): AgentTool<any>[] {
   return [
     {name:'list_sources',label:'查看资料目录',description:'列出可访问资料及章节，正文通过read_source读取。',parameters:Type.Object({}),execute:async()=>toolResult(sources.map(s=>({sourceId:s.sourceId,sourceRevision:s.sourceRevision,title:s.title,chapters:s.chapters.map(c=>({chapterId:c.chapterId,title:c.title,paragraphCount:c.paragraphs.length}))})))},
-    {name:'search_sources',label:'搜索资料',description:'在全部已授权教材和补充资料正文中搜索关键词；返回可引用原文。',parameters:Type.Object({query:Type.String({minLength:1,maxLength:200})}),execute:async(_,input)=>{
+    {name:'search_sources',label:'搜索资料',description:'在全部已授权教材和补充资料正文中检索（关键词+语义），返回可引用原文与命中方式。',parameters:Type.Object({query:Type.String({minLength:1,maxLength:200})}),execute:async(_,input)=>{
       const args=input as {query:string};
+      if(retrieval){
+        try{
+          const result=await retrieval.retrieve(args.query,sources);
+          return toolResult({total:result.hits.length,degraded:result.degraded,keywordCount:result.keywordCount,vectorCount:result.vectorCount,matches:result.hits});
+        }catch{/* 供应商故障不阻断 Agent：退回本地关键词 */}
+      }
       const query=String(args.query).toLowerCase();const terms=query.split(/\s+/).filter(Boolean);
-      const hits=sources.flatMap(s=>s.chapters.flatMap(c=>c.paragraphs.filter(p=>terms.some(t=>p.text.toLowerCase().includes(t))).map(p=>({sourceId:s.sourceId,sourceRevision:s.sourceRevision,chapterId:c.chapterId,paragraphIndex:p.paragraphIndex,text:p.text}))));
-      return toolResult({total:hits.length,matches:hits.slice(0,20)});
+      const hits=sources.flatMap(s=>s.chapters.flatMap(c=>c.paragraphs.filter(p=>terms.some(t=>p.text.toLowerCase().includes(t))).map(p=>({sourceId:s.sourceId,sourceRevision:s.sourceRevision,chapterId:c.chapterId,paragraphIndex:p.paragraphIndex,text:p.text,match:{keyword:true,vector:false,chapterBoost:false}}))));
+      return toolResult({total:hits.length,degraded:retrieval!==undefined,matches:hits.slice(0,20)});
     }},
     {name:'read_source',label:'读取原文',description:'按章节分页读取真实原文。offset是章节内偏移，引用使用返回的paragraphIndex。',parameters:Type.Object({sourceId:Type.String(),chapterId:Type.String(),offset:Type.Optional(Type.Integer({minimum:0})),limit:Type.Optional(Type.Integer({minimum:1,maximum:20}))}),execute:async(_,input)=>{
       const args=input as {sourceId:string;chapterId:string;offset?:number;limit?:number};

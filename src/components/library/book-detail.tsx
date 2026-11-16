@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Archive, ArchiveRestore, Trash2 } from 'lucide-react';
 import { api } from '@/lib/api/client';
-import { useArchiveBook, useBook, useBookUsage, useCourses, useDrafts } from '@/lib/api/hooks';
+import { useArchiveBook, useBook, useBookUsage, useCourses, useDrafts, useRetrievalIndex, useRetrievalIndexAction, useStartRetrievalIndex } from '@/lib/api/hooks';
 import { queryKeys } from '@/lib/api/queries';
 import { courseTitle, draftTitle } from '@/lib/course';
 import { formatLabel, isWebSource, sourceDisplayName } from '@/lib/labels';
@@ -17,6 +17,7 @@ import { Panel } from '@/components/ui/panel';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import { BlockEmpty, BlockError, BlockLoading } from '@/components/states/block-states';
 import { PageHeader } from '@/components/shell/page-header';
+import { RetrievalIndexPanel } from './retrieval-index-panel';
 
 /** 网址里的 #p-761 表示要定位的全书段号 */
 function hashParagraph(): number | null {
@@ -70,6 +71,7 @@ export function BookDetail({ bookId }: { bookId: string }) {
           </nav>
           {active && book.data.sourceRevision && <ChapterText book={book.data} chapterId={active} target={target} />}
           <div className="sticky top-4 grid gap-6 max-xl:static max-xl:col-span-2 max-xl:grid-cols-2 max-md:col-span-1 max-md:grid-cols-1">
+            <RetrievalIndex book={book.data} />
             <UsagePanel book={book.data} />
           </div>
         </div>
@@ -130,6 +132,26 @@ function ChapterText({ book, chapterId, target }: { book: BookView; chapterId: s
         </div>
       )}
     </article>
+  );
+}
+
+/** 语义索引：未配置、未建立、进行中、可恢复、失败、完成 */
+function RetrievalIndex({ book }: { book: BookView }) {
+  const status = useRetrievalIndex(book.bookId);
+  const start = useStartRetrievalIndex(book.bookId);
+  const resume = useRetrievalIndexAction(book.bookId, 'resume');
+  const cancel = useRetrievalIndexAction(book.bookId, 'cancel');
+  const jobId = status.data?.jobId;
+  return (
+    <RetrievalIndexPanel
+      status={status.data}
+      pending={start.isPending || resume.isPending || cancel.isPending}
+      error={status.error ?? start.error ?? resume.error ?? cancel.error}
+      onStart={() => start.mutate()}
+      onResume={() => { if (jobId) resume.mutate(jobId); }}
+      onRetry={() => { if (jobId) resume.mutate(jobId); }}
+      onCancel={() => { if (jobId) cancel.mutate(jobId); }}
+    />
   );
 }
 

@@ -23,6 +23,10 @@ import {Judge0Port} from '@/lib/verified-learning/judge0';
 import {readSettings,saveSettings} from '@/lib/verified-learning/settings';
 import {getConfig} from '@/lib/llm/config';
 import {listModels,ModelListError} from '@/lib/verified-learning/model-list';
+import {IndexJobStore} from '@/lib/verified-learning/retrieval/store';
+import {embeddingSettings,retrievalBundle,PREPROCESS_VERSION} from '@/lib/verified-learning/retrieval/from-settings';
+import {createEmbeddingProfile} from '@/lib/verified-learning/retrieval/profile';
+import {createEmbeddingPort} from '@/lib/verified-learning/retrieval/embedding';
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
 type Context={params:Promise<{path?:string[]}>};
@@ -39,15 +43,69 @@ async function requestModel(request:Request,required=true):Promise<ModelConfig|u
 /** 发起生成前：线上模式检查配额并拿到内存配置 */
 async function beginGeneration(db:ConstructorParameters<typeof LibraryService>[0],request:Request,scope:string):Promise<ModelConfig|undefined>{const config=await requestModel(request);checkGenerationQuota(db,scope);return config;}
 const TERMINAL=new Set(['succeeded','failed','cancelled','waiting_user']);
-function services(request:Request){const base=getServices(request),lib=library(base.db,base.scopeId),model=createLearningModel(),courses=new CourseService(base.db,lib,model),study=new StudyService(base.db,lib,model);return {...base,library:lib,courses,study,records:new RecordService(base.db,study)};}
-function schedule(_request:Request,scope:string,jobId:string,config?:ModelConfig){if(config){rememberJobKey(scope,jobId,config);}after(async()=>{const db=openVerifiedDb();try{const lib=library(db,scope),model=createLearningModel({db,scope,jobId,library:lib,config:jobKey(scope,jobId)});const {JobStore}=await import('@/lib/verified-learning/jobs');const store=new JobStore(db);const job=store.get(scope,jobId);if(job.kind==='curriculum')await new CourseService(db,lib,model).runGeneration(scope,jobId);else if(job.kind==='lesson'||job.kind==='question_set')await new StudyService(db,lib,model).runContent(scope,jobId);}catch{console.error('增强学习任务失败；详情已保存在任务状态中');}finally{try{const {JobStore}=await import('@/lib/verified-learning/jobs');if(TERMINAL.has(new JobStore(db).get(scope,jobId).status))forgetJobKey(scope,jobId);}catch{forgetJobKey(scope,jobId);}db.close();}});}
+function services(request:Request){const base=getServices(request),lib=library(base.db,base.scopeId),bundle=retrievalBundle(base.db,base.scopeId,{publicOnly:isOnline()}),model=createLearningModel(undefined,{retrieval:bundle?.service}),courses=new CourseService(base.db,lib,model),study=new StudyService(base.db,lib,model);return {...base,library:lib,courses,study,records:new RecordService(base.db,study),retrieval:bundle?.service??null};}
+function schedule(_request:Request,scope:string,jobId:string,config?:ModelConfig){if(config){rememberJobKey(scope,jobId,config);}after(async()=>{const db=openVerifiedDb();try{const lib=library(db,scope),bundle=retrievalBundle(db,scope,{publicOnly:isOnline()}),model=createLearningModel({db,scope,jobId,library:lib,config:jobKey(scope,jobId),retrieval:bundle?.service});const {JobStore}=await import('@/lib/verified-learning/jobs');const store=new JobStore(db);const job=store.get(scope,jobId);if(job.kind==='curriculum')await new CourseService(db,lib,model).runGeneration(scope,jobId);else if(job.kind==='lesson'||job.kind==='question_set')await new StudyService(db,lib,model).runContent(scope,jobId);}catch{console.error('增强学习任务失败；详情已保存在任务状态中');}finally{try{const {JobStore}=await import('@/lib/verified-learning/jobs');if(TERMINAL.has(new JobStore(db).get(scope,jobId).status))forgetJobKey(scope,jobId);}catch{forgetJobKey(scope,jobId);}db.close();}});}
 function scheduleAttempt(scope:string,attemptId:string){after(async()=>{const db=openVerifiedDb();try{await new StudyService(db,library(db,scope),createLearningModel()).processAttempt(scope,attemptId);}catch{console.error('判题任务未完成，请读取作答状态后恢复');}finally{db.close();}});}
+/**
+ * 语义索引：只有用户显式确认才建立。配置从设置/环境变量读取（本地）或在线上由浏览器\n * 的 X-VL-Embedding 头提供；凭据不写任务、不写日志。
+ */
+function indexJobView(db:ConstructorParameters<typeof LibraryService>[0],scope:string,jobId:string){return new IndexJobStore(db).get(scope,jobId);}
+function scheduleIndex(scope:string,jobId:string,source:Parameters<typeof IndexJobStore.prototype.create>[0]['source'],profile:ReturnType<typeof createEmbeddingProfile>,settings:{baseUrl:string;model:string;apiKey:string;dimensions?:number|null},publicOnly:boolean){after(async()=>{const db=openVerifiedDb();try{const store=new IndexJobStore(db);const port=createEmbeddingPort({baseUrl:settings.baseUrl,model:settings.model,apiKey:settings.apiKey,dimensions:settings.dimensions??undefined},{publicOnly});await store.run({scopeId:scope,jobId,source,profile},port);}catch{console.error('语义索引任务失败；详情已保存在任务状态中');}finally{db.close();}});}
 async function handle(rawRequest:Request,context:Context){const requestId=randomUUID();const request=normalizeDevUrl(rawRequest);let opened:ReturnType<typeof services>|undefined;try{const parts=(await context.params).path??[],[resource,id,action,subId]=parts;const method=request.method;const key=()=>{const value=request.headers.get('idempotency-key');if(!value?.trim()||value.length>200)throw new LearningError('INVALID_INPUT','需要Idempotency-Key');return value;};const body=async()=>{const value=await readJson(request);if(!value||typeof value!=='object'||Array.isArray(value))throw new LearningError('INVALID_INPUT','需要JSON对象');return value as Record<string,unknown>;};
  if(resource==='mode'&&method==='GET')return ok(modeView(),requestId);
  if(resource==='access'){assertEnabled();assertRequest(request);const db=openVerifiedDb();try{if(method==='POST'){const input=parse(z.strictObject({token:z.string().max(128)}),await readJson(request,4096));const result=loginWith(db,request,input.token);const response=ok({expiresAt:result.expiresAt},requestId);for(const cookie of result.cookies)response.headers.append('set-cookie',cookie);return response;}if(method==='DELETE'){const response=ok({loggedOut:true},requestId);for(const cookie of logoutWith(db,request))response.headers.append('set-cookie',cookie);return response;}requireAccess(db,request);return ok({authenticated:true},requestId);}finally{db.close();}}
  opened=services(request);const {scopeId:scope,library,courses,study,records,jobs}=opened;const url=new URL(request.url);
  if(resource==='settings'&&id==='models'&&method==='POST'){if(isOnline()){const config=(await requestModel(request))!;return ok(await listModels({provider:config.provider,baseUrl:config.baseUrl,apiKey:config.apiKey},{},{publicOnly:true}),requestId);}const saved:Record<string,string|undefined>={};for(const name of ['llm_provider','llm_base_url','llm_api_key']){const row=opened.db.prepare('SELECT value FROM settings WHERE key=?').get(name) as {value:string}|undefined;saved[name]=row?.value||process.env[name.toUpperCase()];}return ok(await listModels(await body(),saved),requestId);}
  if(resource==='settings'&&!id){if(isOnline()&&method!=='GET')throw new AppError('FORBIDDEN','线上模式的模型配置只保存在浏览器里');if(method==='GET')return ok(isOnline()?{llm_provider:'openai-compatible',online:true}:readSettings(opened.db),requestId);if(method==='PATCH')return ok(saveSettings(opened.db,await body()),requestId);}
+ if(resource==='retrieval-jobs'&&id){
+  const store=new IndexJobStore(opened.db);
+  if(method==='GET')return ok(store.get(scope,id),requestId);
+  if(method==='POST'&&action==='cancel')return ok(store.cancel(scope,id),requestId);
+  if(method==='POST'&&action==='resume'){
+   const job=store.get(scope,id);
+   const book=library.get(scope,job.bookId);
+   if(!book.sourceRevision)throw new LearningError('VALIDATION_FAILED','教材尚无可索引的内容');
+   const source=library.source(scope,job.bookId,job.sourceRevision);
+   const settings=embeddingSettings(opened.db);
+   if(!settings)throw new AppError('MODEL_KEY_REQUIRED','请先在设置中填写 Embedding 模型和 Key');
+   const profile=createEmbeddingProfile({provider:'openai-compatible',baseUrl:settings.baseUrl,model:settings.model,dimensions:settings.dimensions??null},PREPROCESS_VERSION);
+   if(profile.profileId!==job.profileId)throw new LearningError('VERSION_CONFLICT','Embedding 配置已变化，请重新建立索引');
+   const resumed=store.resume(scope,id);
+   scheduleIndex(scope,id,source,profile,settings,false);
+   return ok(resumed,requestId,202);
+  }
+ }
+ if(resource==='textbooks'&&id&&action==='retrieval-index'){
+  const book=library.get(scope,id);
+  if(!book.sourceRevision)throw new LearningError('VALIDATION_FAILED','教材尚无可索引的内容');
+  const source=library.source(scope,id,book.sourceRevision);
+  const settings=embeddingSettings(opened.db);
+  const dimensions=null;
+  const profile=settings?createEmbeddingProfile({provider:'openai-compatible',baseUrl:settings.baseUrl,model:settings.model,dimensions},PREPROCESS_VERSION):null;
+  const store=new IndexJobStore(opened.db);
+  if(method==='GET'){
+   if(!settings||!profile)return ok({status:'none',profileId:null,ready:0,failed:0,total:0,jobId:null,usable:false,configured:false,model:null},requestId);
+   return ok({...store.status(scope,id,source.sourceRevision,profile.profileId),configured:true,model:settings.model},requestId);
+  }
+      if (method === 'POST') {
+        const input = parse(z.strictObject({ confirm: z.literal(true) }), await body());
+        if (!settings || !profile) throw new AppError('MODEL_KEY_REQUIRED', '请先在设置中填写 Embedding 模型和 Key');
+        const job = store.create({ scopeId: scope, key: key(), source, profile });
+        void input;
+        scheduleIndex(scope, id, source, profile, settings, false);
+        return ok(job, requestId, 202);
+      }
+ }
+ if(resource==='sessions'&&id&&action==='retrieve'&&method==='POST'){
+  const session=study.get(scope,id);
+  const input=parse(z.strictObject({query:z.string().min(1).max(200),limit:z.number().int().min(1).max(20).optional()}),await body());
+  const version=session.version;
+  const sources=version.sourceRevisions.map(ref=>library.source(scope,ref.sourceId,ref.sourceRevision));
+  const bundle=retrievalBundle(opened.db,scope,{publicOnly:isOnline()});
+  const result=bundle?await bundle.service.retrieve(input.query,sources,{limit:input.limit}):null;
+  if(!result){const {keywordSearch}=await import('@/lib/verified-learning/retrieval/search');const {sourceChunks}=await import('@/lib/verified-learning/retrieval/indexer');const chunks=sources.flatMap(source=>sourceChunks(scope,source,PREPROCESS_VERSION));const hits=keywordSearch(input.query,chunks,input.limit??10);return ok({hits:hits.map(chunk=>({sourceId:chunk.sourceId,sourceRevision:chunk.sourceRevision,chapterId:chunk.chapterId,paragraphIndex:chunk.paragraphIndex,text:chunk.text,score:0,match:{keyword:true,vector:false,chapterBoost:false},contentHash:chunk.contentHash})),degraded:false,keywordCount:hits.length,vectorCount:0},requestId);}
+  return ok(result,requestId);
+ }
  if(resource==='textbooks'){
   if(!id&&method==='GET')return ok(library.list(scope,url.searchParams.get('q')??'',url.searchParams.get('archived')==='true'),requestId);
   if(!id&&method==='POST'){const form=await request.formData();const file=form.get('file');if(!(file instanceof File))throw new LearningError('INVALID_INPUT','缺少教材文件');return ok(await library.importFile(scope,key(),file),requestId,201);}
@@ -66,7 +124,7 @@ async function handle(rawRequest:Request,context:Context){const requestId=random
  }
  if(resource==='courses'&&method==='GET')return ok(courses.courses(scope),requestId);
  if(resource==='jobs'){if(!id&&method==='GET')return ok(jobs.list(scope),requestId);if(id&&method==='GET'&&action==='stream'){const last=Number(request.headers.get('last-event-id')??url.searchParams.get('after')??0);return jobStreamResponse(openVerifiedDb,scope,id,Number.isSafeInteger(last)?last:0,request.signal);}if(id&&method==='GET'&&action==='trace')return ok(buildTrace(opened.db,scope,id),requestId);if(id&&method==='GET')return ok(action==='events'?jobs.events(scope,id,Number(url.searchParams.get('after')??0)):jobs.get(scope,id),requestId);if(id&&method==='POST'&&action==='resume'){if(jobs.get(scope,id).kind==='import')throw new LearningError('VALIDATION_FAILED','导入重试请重新上传原文件');const config=await requestModel(request);const job=jobs.resume(scope,id);schedule(request,scope,id,config);return ok(job,requestId,202);}if(id&&method==='POST'&&action==='cancel')return ok(jobs.cancel(scope,id),requestId);}
- if(resource==='sessions'&&id){if(!action&&method==='GET')return ok(study.get(scope,id),requestId);if(action==='tutor'&&method==='POST'){const config=await requestModel(request);const input=parseTutorRequest(await readJson(request,256*1024));const context=buildTutorContext(opened.db,library,scope,id,input.runId,input.selection);return await tutorResponse({model:tutorModel(config),context,messages:input.messages as unknown as UIMessage[],abortSignal:request.signal,secret:config?.apiKey});}if(action==='history'&&method==='GET')return ok(study.history(scope,id,subId),requestId);if(method==='POST'||method==='PATCH'){const b=await body();if(action==='start'){const current=study.get(scope,id);// 续开或示例课程预先生成好的活动不新建任务：不计配额，也不强制要求 Key
+ if(resource==='sessions'&&id){if(!action&&method==='GET')return ok(study.get(scope,id),requestId);if(action==='tutor'&&method==='POST'){const config=await requestModel(request);const input=parseTutorRequest(await readJson(request,256*1024));const context=buildTutorContext(opened.db,library,scope,id,input.runId,input.selection,opened.retrieval??undefined);return await tutorResponse({model:tutorModel(config),context,messages:input.messages as unknown as UIMessage[],abortSignal:request.signal,secret:config?.apiKey});}if(action==='history'&&method==='GET')return ok(study.history(scope,id,subId),requestId);if(method==='POST'||method==='PATCH'){const b=await body();if(action==='start'){const current=study.get(scope,id);// 续开或示例课程预先生成好的活动不新建任务：不计配额，也不强制要求 Key
 const config=current.currentRun||current.nextPrepared?await requestModel(request,false):await beginGeneration(opened.db,request,scope);const result=study.start(scope,id,Number(b.expectedRevision),key());if(result.job){if(!current.currentRun)countGeneration(opened.db,scope);schedule(request,scope,result.job.jobId,config);}return ok(result,requestId,result.job?202:200);}if(action==='lesson-completion')return ok(study.completeLesson(scope,id,String(b.runId),Number(b.expectedRevision),key()),requestId);if(action==='prior-knowledge')return ok(study.declarePrior(scope,id,Number(b.expectedRevision),key(),parse(z.array(z.string().min(1)).max(200),b.knowledgePointIds)),requestId);if(action==='mode')return ok(study.changeMode(scope,id,Number(b.expectedRevision),key(),String(b.mode)),requestId);if(action==='abandon')return ok(study.abandon(scope,id,String(b.runId),Number(b.expectedRevision),key()),requestId);if(action==='cursor')return ok(study.saveCursor(scope,id,Number(b.expectedRevision),b.cursor as Parameters<StudyService['saveCursor']>[3]),requestId);if(action==='remedial'){const config=await beginGeneration(opened.db,request,scope);const result=study.remedial(scope,id,key());countGeneration(opened.db,scope);schedule(request,scope,result.job.jobId,config);return ok(result,requestId,202);}}}
  if(resource==='runs'&&id){if(!action&&method==='GET')return ok(study.runView(scope,id),requestId);if(action==='attempts'&&method==='POST'){const b=parse(z.strictObject({questionId:z.string(),answer:z.string().max(65536)}),await body());const result=await study.submit(scope,id,b.questionId,key(),b.answer);if(result.state==='pending')scheduleAttempt(scope,result.attemptId);return ok(result,requestId,result.state==='pending'?202:200);}if(action==='hints'&&method==='POST'){const b=parse(z.strictObject({questionId:z.string(),level:z.number().int().min(1).max(4)}),await body());return ok(study.hint(scope,id,b.questionId,b.level),requestId);}}
  if(resource==='attempts'&&id){if(method==='GET')return ok(study.attemptStatus(scope,id),requestId);if(method==='POST'&&action==='resume'){const b=await body();return ok(await study.resumeAttempt(scope,id,b.allowUnknown===true),requestId);}}

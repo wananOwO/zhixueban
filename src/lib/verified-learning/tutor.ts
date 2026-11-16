@@ -4,7 +4,7 @@ import { createAnthropic } from '@ai-sdk/anthropic';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { z } from 'zod';
 import { getModel } from '../llm/provider';
-import { createSourceTools } from './agent/source-tools';
+import { createSourceTools, type SourceRetrieval } from './agent/source-tools';
 import { publicOnlyFetch } from './agent/web';
 import { LearningError } from './contracts';
 import { AppError } from './errors';
@@ -52,13 +52,13 @@ export function parseTutorRequest(input: unknown): TutorRequest {
   return result.data;
 }
 
-export interface TutorContext { system: string; sources: SourceSnapshot[] }
+export interface TutorContext { system: string; sources: SourceSnapshot[]; retrieval?: SourceRetrieval }
 
 const cut = (text: string, max: number) => (text.length > max ? `${text.slice(0, max)}…（已截断）` : text);
 
 export function buildTutorContext(
   db: Database.Database, library: LibraryService, scope: string, sessionId: string, runId?: string,
-  selection?: TutorRequest['selection'],
+  selection?: TutorRequest['selection'], retrieval?: SourceRetrieval,
 ): TutorContext {
   const store = new VerifiedLearningStore(db);
   const session = store.getSession(scope, sessionId);
@@ -122,7 +122,7 @@ export function buildTutorContext(
 
   lines.push('', '可用资料目录：');
   for (const source of sources) lines.push(`- ${source.sourceId}：${source.title}（${source.chapters.map(c => c.title).join('、')}）`);
-  return { system: lines.join('\n'), sources };
+  return { system: lines.join('\n'), sources, retrieval };
 }
 
 /** 助教使用的模型：线上模式用浏览器传来的配置（请求前校验公网地址、禁止重定向）；本地模式用设置页 */
@@ -139,7 +139,7 @@ export function tutorModel(config?: ModelConfig): LanguageModel {
 export async function tutorResponse(options: {
   model: LanguageModel; context: TutorContext; messages: UIMessage[]; abortSignal?: AbortSignal; secret?: string;
 }): Promise<Response> {
-  const agentTools = createSourceTools(options.context.sources);
+  const agentTools = createSourceTools(options.context.sources, options.context.retrieval);
   const run = async (name: string, input: unknown) => {
     const found = agentTools.find(t => t.name === name)!;
     const result = await found.execute('tutor', input as never);

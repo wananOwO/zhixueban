@@ -5,7 +5,7 @@ import { parse, proposalSchema, questionSchema, verdictSchema, citationSchema, t
 import { checkCitation, contentHash } from '../sources';
 import { runLearningAgent } from './runtime';
 import { createAgentConnection, type AgentConnection } from './provider';
-import { createSourceTools, toolResult } from './source-tools';
+import { createSourceTools, toolResult, type SourceRetrieval } from './source-tools';
 import { extractPage, fetchPublicText, searchPublicWeb } from './web';
 import type { AgentJournal } from './journal';
 import { redact } from '../provider-error';
@@ -14,6 +14,8 @@ export interface LearningAgentOptions {
   connection?: AgentConnection;
   journal?: (stage: string) => AgentJournal;
   persistSource?: (source: SourceSnapshot) => void;
+  /** 统一检索服务；不注入时 search_sources 退回本地关键词匹配 */
+  retrieval?: SourceRetrieval;
   signal?: AbortSignal;
   maxRequests?: number;
 }
@@ -41,7 +43,7 @@ export function createAgentLearningModel(options: LearningAgentOptions = {}): Le
     if(journal?.cancelled())throw new Error('任务已取消或执行权已转移');
     if(artifacts.result!==undefined)return artifacts.result as T;
     const finish=(result:T)=>{options.signal?.throwIfAborted();if(journal?.cancelled())throw new Error('任务已取消，不发布成果');artifacts.result=result;save();};
-    const tools=[...createSourceTools(sources),...build(artifacts,save,finish)];
+    const tools=[...createSourceTools(sources,options.retrieval),...build(artifacts,save,finish)];
     tools.push({ name:'get_generation_state',label:'核对已生成内容',description:'恢复或修正时查看已保存计划、知识点、课件小节与题号，避免重复生成。',parameters:Type.Object({}),execute:async()=>toolResult({...artifacts,webSources:(artifacts.webSources??[]).map(s=>({sourceId:s.sourceId,title:s.title}))}) });
     if(allowWeb)tools.push(
       {name:'search_web',label:'搜索公开资料',description:'搜索教材缺少的知识点。结果摘要不可直接引用，请再fetch_web_source保存正文。优先官方文档和权威教程。',parameters:Type.Object({query:Type.String({minLength:1,maxLength:300})}),execute:async(_,input,signal)=>toolResult(await searchPublicWeb((input as {query:string}).query,signal))},
