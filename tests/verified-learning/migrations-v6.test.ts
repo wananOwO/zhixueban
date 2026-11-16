@@ -21,13 +21,13 @@ describe('schema v6：检索派生索引', () => {
     await migrateVerifiedLearning(db);
     db.prepare(`INSERT INTO vl_books(scope_id,book_id,origin,status,created_at) VALUES ('scope','book','owned','ready','t')`).run();
     db.prepare(`INSERT INTO vl_source_revisions(scope_id,book_id,source_revision,snapshot_json,created_at) VALUES ('scope','book','revision','{"chapters":[]}','t')`).run();
-    const row = ['scope', 'job-1', 'book', 'revision', 'profile'];
+    const row = ['scope', 'job-1', 'book', 'revision', 'profile', 'key-1'];
     const insert = db.prepare(`INSERT INTO vl_index_jobs
-      (scope_id,job_id,book_id,source_revision,profile_id,status,progress_json,created_at,updated_at)
-      VALUES (?,?,?,?,?,'queued','{}',?,?)`);
+      (scope_id,job_id,book_id,source_revision,profile_id,idempotency_key,status,progress_json,created_at,updated_at)
+      VALUES (?,?,?,?,?,?,'queued','{}',?,?)`);
     insert.run(...row, '2026-11-17', '2026-11-17');
-    expect(() => insert.run('scope', 'job-2', 'book', 'revision', 'profile', '2026-11-17', '2026-11-17')).toThrow(/UNIQUE|constraint/i);
-    insert.run('scope', 'job-3', 'book', 'revision', 'profile-2', '2026-11-17', '2026-11-17');
+    expect(() => insert.run('scope', 'job-2', 'book', 'revision', 'profile', 'key-2', '2026-11-17', '2026-11-17')).toThrow(/UNIQUE|constraint/i);
+    insert.run('scope', 'job-3', 'book', 'revision', 'profile-2', 'job-3', '2026-11-17', '2026-11-17');
     expect(db.prepare('SELECT count(*) AS count FROM vl_index_jobs').get()).toEqual({ count: 2 });
   });
 

@@ -17,8 +17,8 @@ async function dbWithIndexedSpace() {
     VALUES (?,?,'revision','chapter',0,0,'text','hash','v1')`).run(SPACE, 'book');
   db.prepare(`INSERT INTO vl_retrieval_vectors(scope_id,book_id,source_revision,chapter_id,paragraph_index,part_index,profile_id,dimensions,vector_blob,status,updated_at)
     VALUES (?,?,'revision','chapter',0,0,'profile',3,NULL,'failed','t')`).run(SPACE, 'book');
-  db.prepare(`INSERT INTO vl_index_jobs(scope_id,job_id,book_id,source_revision,profile_id,status,progress_json,created_at,updated_at)
-    VALUES (?,?,'book','revision','profile','queued','{}','t','t')`).run(SPACE, 'job');
+  db.prepare(`INSERT INTO vl_index_jobs(scope_id,job_id,book_id,source_revision,profile_id,idempotency_key,status,progress_json,created_at,updated_at)
+    VALUES (?,?,'book','revision','profile','key','queued','{}','t','t')`).run(SPACE, 'job');
   return db;
 }
 

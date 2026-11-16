@@ -15,13 +15,14 @@ export interface IndexSummary {
 }
 
 /** 每批最多 16 个子块、合计 12000 字符（设计 5.3）。 */
-const MAX_BATCH_CHUNKS = 16;
-const MAX_BATCH_CHARS = 12_000;
+export const MAX_BATCH_CHUNKS = 16;
+export const MAX_BATCH_CHARS = 12_000;
+export const MAX_BATCH_REQUESTS = 100;
 
 const keyOf = (chunk: { chapterId: string; paragraphIndex: number; partIndex: number }) =>
   `${chunk.chapterId}\0${chunk.paragraphIndex}\0${chunk.partIndex}`;
 
-function ensureChunks(db: Database.Database, scopeId: string, chunks: readonly RetrievalChunk[]): void {
+export function ensureChunks(db: Database.Database, scopeId: string, chunks: readonly RetrievalChunk[]): void {
   const insert = db.prepare(`INSERT OR IGNORE INTO vl_retrieval_chunks
     (scope_id,book_id,source_revision,chapter_id,paragraph_index,part_index,text,content_hash,preprocess_version)
     VALUES (?,?,?,?,?,?,?,?,?)`);
@@ -32,15 +33,15 @@ function ensureChunks(db: Database.Database, scopeId: string, chunks: readonly R
   })();
 }
 
-function pendingChunks(db: Database.Database, scopeId: string, chunks: readonly RetrievalChunk[], profile: EmbeddingProfile): RetrievalChunk[] {
+export function pendingChunks(db: Database.Database, scopeId: string, bookId: string, sourceRevision: string, chunks: readonly RetrievalChunk[], profile: EmbeddingProfile): RetrievalChunk[] {
   const rows = db.prepare(`SELECT chapter_id,paragraph_index,part_index,status,dimensions FROM vl_retrieval_vectors
-    WHERE scope_id=? AND book_id=? AND source_revision=? AND profile_id=?`).all(scopeId, chunks[0]?.sourceId ?? '', chunks[0]?.sourceRevision ?? '', profile.profileId) as
+    WHERE scope_id=? AND book_id=? AND source_revision=? AND profile_id=?`).all(scopeId, bookId, sourceRevision, profile.profileId) as
     { chapter_id: string; paragraph_index: number; part_index: number; status: string; dimensions: number }[];
-  const done = new Set(rows.filter(row => row.status === 'ready' && row.dimensions === profile.dimensions).map(row => keyOf({ chapterId: row.chapter_id, paragraphIndex: row.paragraph_index, partIndex: row.part_index })));
+  const done = new Set(rows.filter(row => row.status === 'ready' && (profile.dimensions === null || row.dimensions === profile.dimensions)).map(row => keyOf({ chapterId: row.chapter_id, paragraphIndex: row.paragraph_index, partIndex: row.part_index })));
   return chunks.filter(chunk => !done.has(keyOf(chunk)));
 }
 
-function batches(items: readonly RetrievalChunk[]): RetrievalChunk[][] {
+export function batches(items: readonly RetrievalChunk[]): RetrievalChunk[][] {
   const out: RetrievalChunk[][] = [];
   let current: RetrievalChunk[] = [];
   let chars = 0;
@@ -52,13 +53,18 @@ function batches(items: readonly RetrievalChunk[]): RetrievalChunk[][] {
   return out;
 }
 
-function save(db: Database.Database, scopeId: string, profile: EmbeddingProfile, chunk: RetrievalChunk, status: 'ready' | 'failed', blob: Buffer | null, errorCode: string | null): void {
+export function saveVector(db: Database.Database, scopeId: string, profile: EmbeddingProfile, chunk: RetrievalChunk, dimensions: number, status: 'ready' | 'failed', blob: Buffer | null, errorCode: string | null): void {
   db.prepare(`INSERT INTO vl_retrieval_vectors
     (scope_id,book_id,source_revision,chapter_id,paragraph_index,part_index,profile_id,dimensions,vector_blob,status,error_code,updated_at)
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
     ON CONFLICT(scope_id,book_id,source_revision,chapter_id,paragraph_index,part_index,profile_id)
     DO UPDATE SET dimensions=excluded.dimensions,vector_blob=excluded.vector_blob,status=excluded.status,error_code=excluded.error_code,updated_at=excluded.updated_at`)
-    .run(scopeId, chunk.sourceId, chunk.sourceRevision, chunk.chapterId, chunk.paragraphIndex, chunk.partIndex, profile.profileId, profile.dimensions, blob, status, errorCode, new Date().toISOString());
+    .run(scopeId, chunk.sourceId, chunk.sourceRevision, chunk.chapterId, chunk.paragraphIndex, chunk.partIndex, profile.profileId, dimensions, blob, status, errorCode, new Date().toISOString());
+}
+
+/** 派生块入表（来源快照不变） */
+export function sourceChunks(scopeId: string, source: Parameters<typeof createRetrievalChunks>[0], preprocessVersion: string): RetrievalChunk[] {
+  return createRetrievalChunks(source, preprocessVersion).map(chunk => ({ ...chunk, scopeId }));
 }
 
 /**
@@ -66,10 +72,10 @@ function save(db: Database.Database, scopeId: string, profile: EmbeddingProfile,
  * 已存在且维度匹配的 ready 向量不会重复请求，因此重复调用不重复计费。
  */
 export async function indexSource(db: Database.Database, scopeId: string, source: Parameters<typeof createRetrievalChunks>[0], profile: EmbeddingProfile, port: EmbeddingPort): Promise<IndexSummary> {
-  const chunks = createRetrievalChunks(source, profile.preprocessVersion).map(chunk => ({ ...chunk, scopeId }));
+  const chunks = sourceChunks(scopeId, source, profile.preprocessVersion);
   if (!chunks.length) return { ready: 0, failed: 0, skipped: 0 };
   ensureChunks(db, scopeId, chunks);
-  const pending = pendingChunks(db, scopeId, chunks, profile);
+  const pending = pendingChunks(db, scopeId, source.sourceId, source.sourceRevision, chunks, profile);
   let ready = 0, failed = 0;
   for (const batch of batches(pending)) {
     try {
@@ -78,12 +84,17 @@ export async function indexSource(db: Database.Database, scopeId: string, source
       db.transaction(() => {
         batch.forEach((chunk, index) => {
           const values = vectors[index];
-          if (!values || values.length !== profile.dimensions) { save(db, scopeId, profile, chunk, 'failed', null, 'DIMENSION_MISMATCH'); failed++; return; }
-          save(db, scopeId, profile, chunk, 'ready', encodeVector(values), null); ready++;
+          const dimensions = profile.dimensions ?? values?.length ?? 0;
+          if (!values || !dimensions || values.length !== dimensions) { saveVector(db, scopeId, profile, chunk, dimensions, 'failed', null, 'DIMENSION_MISMATCH'); failed++; return; }
+          try {
+            saveVector(db, scopeId, profile, chunk, dimensions, 'ready', encodeVector(values), null); ready++;
+          } catch {
+            saveVector(db, scopeId, profile, chunk, dimensions, 'failed', null, 'DIMENSION_MISMATCH'); failed++;
+          }
         });
       })();
     } catch {
-      db.transaction(() => { for (const chunk of batch) save(db, scopeId, profile, chunk, 'failed', null, 'EMBEDDING_FAILED'); })();
+      db.transaction(() => { for (const chunk of batch) saveVector(db, scopeId, profile, chunk, profile.dimensions ?? 0, 'failed', null, 'EMBEDDING_FAILED'); })();
       failed += batch.length;
     }
   }

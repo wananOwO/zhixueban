@@ -30,12 +30,12 @@ CREATE TABLE vl_retrieval_vectors (
  paragraph_index INTEGER NOT NULL,
  part_index INTEGER NOT NULL,
  profile_id TEXT NOT NULL,
- dimensions INTEGER NOT NULL CHECK (typeof(dimensions) = 'integer' AND dimensions > 0),
+ dimensions INTEGER NOT NULL CHECK (typeof(dimensions) = 'integer' AND dimensions >= 0),
  vector_blob BLOB,
  status TEXT NOT NULL CHECK (status IN ('pending','ready','failed','stale')),
  error_code TEXT,
  updated_at TEXT NOT NULL,
- CHECK (status <> 'ready' OR (vector_blob IS NOT NULL AND length(vector_blob) = dimensions * 4)),
+ CHECK (status <> 'ready' OR (dimensions > 0 AND vector_blob IS NOT NULL AND length(vector_blob) = dimensions * 4)),
  PRIMARY KEY (scope_id, book_id, source_revision, chapter_id, paragraph_index, part_index, profile_id),
  FOREIGN KEY (scope_id, book_id, source_revision, chapter_id, paragraph_index, part_index)
    REFERENCES vl_retrieval_chunks(scope_id, book_id, source_revision, chapter_id, paragraph_index, part_index)
@@ -47,6 +47,7 @@ CREATE TABLE vl_index_jobs (
  book_id TEXT NOT NULL,
  source_revision TEXT NOT NULL,
  profile_id TEXT NOT NULL,
+ idempotency_key TEXT NOT NULL,
  status TEXT NOT NULL CHECK (status IN ('queued','running','waiting_user','succeeded','failed','cancelled')),
  lease_token TEXT,
  lease_until TEXT,
@@ -55,6 +56,7 @@ CREATE TABLE vl_index_jobs (
  created_at TEXT NOT NULL,
  updated_at TEXT NOT NULL,
  PRIMARY KEY (scope_id, job_id),
+ UNIQUE (scope_id, idempotency_key),
  FOREIGN KEY (scope_id, book_id, source_revision) REFERENCES vl_source_revisions(scope_id, book_id, source_revision)
 );
 CREATE UNIQUE INDEX vl_index_job_active ON vl_index_jobs(scope_id, book_id, source_revision, profile_id)
