@@ -147,9 +147,10 @@ function RetrievalIndex({ book }: { book: BookView }) {
       status={status.data}
       pending={start.isPending || resume.isPending || cancel.isPending}
       error={status.error ?? start.error ?? resume.error ?? cancel.error}
-      onStart={() => start.mutate()}
+      onStart={() => start.mutate(undefined)}
+      onRebuild={() => start.mutate({ rebuild: true })}
       onResume={() => { if (jobId) resume.mutate(jobId); }}
-      onRetry={() => { if (jobId) resume.mutate(jobId); }}
+      onRetry={() => { if (jobId) resume.mutate(jobId); else start.mutate(undefined); }}
       onCancel={() => { if (jobId) cancel.mutate(jobId); }}
     />
   );

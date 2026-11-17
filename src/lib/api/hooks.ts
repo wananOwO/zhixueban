@@ -22,22 +22,30 @@ export function useBookUsage(id: string | undefined) {
   return useQuery({ queryKey: queryKeys.bookUsage(id ?? ''), enabled: !!id, queryFn: () => api<DeletionImpact>(`/textbooks/${encodeURIComponent(id!)}/deletion`) });
 }
 
-/** 语义索引状态：进行中每 2 秒刷新，页面不可见时由 TanStack 自动暂停轮询 */
+/** 语义索引状态：进行中（且租约未过期）每 2 秒刷新，页面不可见时由 TanStack 自动暂停轮询 */
 export function useRetrievalIndex(id: string | undefined) {
   return useQuery({
-    queryKey: queryKeys.retrievalIndex(id ?? ''), enabled: !!id,
+    queryKey: queryKeys.retrievalIndex(id ?? ''),
+    enabled: !!id,
     refetchInterval: query => {
-      const status = (query.state.data as RetrievalIndexStatusView | undefined)?.status;
-      return status === 'running' || status === 'queued' ? 2_000 : false;
+      const data = query.state.data as RetrievalIndexStatusView | undefined;
+      if (!data || data.leaseExpired) return false;
+      return data.status === 'running' || data.status === 'queued' ? 2_000 : false;
     },
-    queryFn: () => api<RetrievalIndexStatusView>(`/textbooks/${encodeURIComponent(id!)}/retrieval-index`),
+    queryFn: () => api<RetrievalIndexStatusView>(`/textbooks/${encodeURIComponent(id!)}/retrieval-index`, { embeddingHeader: true }),
   });
 }
 
 export function useStartRetrievalIndex(id: string) {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: () => api(`/textbooks/${encodeURIComponent(id)}/retrieval-index`, { method: 'POST', body: { confirm: true }, key: newKey() }),
+    mutationFn: (options?: { rebuild?: boolean }) =>
+      api(`/textbooks/${encodeURIComponent(id)}/retrieval-index`, {
+        method: 'POST',
+        body: { confirm: true, ...(options?.rebuild ? { rebuild: true } : {}) },
+        key: newKey(),
+        embeddingHeader: true,
+      }),
     onSettled: () => { void client.invalidateQueries({ queryKey: queryKeys.retrievalIndex(id) }); },
   });
 }
@@ -45,7 +53,8 @@ export function useStartRetrievalIndex(id: string) {
 export function useRetrievalIndexAction(id: string, action: 'cancel' | 'resume') {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (jobId: string) => api(`/retrieval-jobs/${encodeURIComponent(jobId)}/${action}`, { method: 'POST', body: {} }),
+    mutationFn: (jobId: string) =>
+      api(`/retrieval-jobs/${encodeURIComponent(jobId)}/${action}`, { method: 'POST', body: {}, embeddingHeader: true }),
     onSettled: () => { void client.invalidateQueries({ queryKey: queryKeys.retrievalIndex(id) }); },
   });
 }

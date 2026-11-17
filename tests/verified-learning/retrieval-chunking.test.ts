@@ -23,4 +23,25 @@ describe('检索分块', () => {
     expect(chunks.map(chunk => chunk.text)).toEqual(['甲甲甲。', '乙乙乙。', '丙丙丙。', '丁丁丁。']);
     expect(chunks.every(chunk => chunk.paragraphIndex === 2 && chunk.text.length <= 6)).toBe(true);
   });
+
+  it('保留代码缩进与大小写，并在默认长段切块时带不超过 100 字的句界重叠', () => {
+    const sentenceA = 'def fib(n):\n    if n <= 1:\n        return n\n';
+    const sentenceB = `${'递归调用自身计算前两项之和，注意保存中间状态避免指数级重复计算。'.repeat(30)}`;
+    const sentenceC = `${'当输入规模较大时可以改写为动态规划迭代形式，空间复杂度降到常数。'.repeat(15)}`;
+    const codeParagraph = `${sentenceA}${sentenceB}${sentenceC}`;
+    expect(codeParagraph.length).toBeGreaterThan(1000);
+    const codeSource: SourceSnapshot = {
+      ...source,
+      chapters: [{ chapterId: 'ch-code', title: '代码章', paragraphs: [{ paragraphIndex: 5, text: codeParagraph, contentHash: 'hash-code' }] }],
+    };
+    const chunks = createRetrievalChunks(codeSource, 'v1', 1000, 100);
+    expect(chunks.length).toBeGreaterThanOrEqual(2);
+    expect(chunks[0].text.startsWith('def fib(n):\n    if n <= 1:')).toBe(true);
+    expect(chunks.every(c => c.paragraphIndex === 5 && c.text.length <= 1000)).toBe(true);
+    // 相邻子块之间存在重叠且重叠长度不超过 100 字符
+    const tail = chunks[0].text.slice(-100);
+    const overlapSentence = '递归调用自身计算前两项之和，注意保存中间状态避免指数级重复计算。';
+    expect(tail).toContain(overlapSentence);
+    expect(chunks[1].text.startsWith(overlapSentence)).toBe(true);
+  });
 });

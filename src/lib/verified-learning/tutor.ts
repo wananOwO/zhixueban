@@ -56,23 +56,29 @@ export interface TutorContext { system: string; sources: SourceSnapshot[]; retri
 
 const cut = (text: string, max: number) => (text.length > max ? `${text.slice(0, max)}…（已截断）` : text);
 
+export function sessionSources(db: Database.Database, library: LibraryService, scope: string, sessionId: string) {
+  const store = new VerifiedLearningStore(db);
+  const session = store.getSession(scope, sessionId);
+  const version = store.getVersion(scope, session.courseVersionId);
+  const review = db.prepare('SELECT teaching_json FROM vl_course_reviews WHERE scope_id=? AND version_id=?').get(scope, version.courseVersionId) as { teaching_json: string } | undefined;
+  const input = review ? JSON.parse(review.teaching_json) as { sources?: { sourceId: string; chapterIds: string[] }[] } : null;
+  const chapterFiltered = Boolean(input?.sources?.some(s => s.chapterIds.length > 0));
+  const sources = version.sourceRevisions.map(ref => {
+    const source = library.source(scope, ref.sourceId, ref.sourceRevision);
+    const selected = input?.sources?.find(s => s.sourceId === ref.sourceId);
+    if (selected) {
+      source.chapters = source.chapters.filter(c => selected.chapterIds.includes(c.chapterId));
+    }
+    return source;
+  });
+  return { session, version, sources, chapterFiltered };
+}
+
 export function buildTutorContext(
   db: Database.Database, library: LibraryService, scope: string, sessionId: string, runId?: string,
   selection?: TutorRequest['selection'], retrieval?: SourceRetrieval,
 ): TutorContext {
-  const store = new VerifiedLearningStore(db);
-  const session = store.getSession(scope, sessionId);
-  const version = store.getVersion(scope, session.courseVersionId);
-
-  // 资料范围与生成时一致：课程版本的来源，按草稿所选章节过滤
-  const review = db.prepare('SELECT teaching_json FROM vl_course_reviews WHERE scope_id=? AND version_id=?').get(scope, version.courseVersionId) as { teaching_json: string } | undefined;
-  const input = review ? JSON.parse(review.teaching_json) as { sources?: { sourceId: string; chapterIds: string[] }[] } : null;
-  const sources = version.sourceRevisions.map(ref => {
-    const source = library.source(scope, ref.sourceId, ref.sourceRevision);
-    const selected = input?.sources?.find(s => s.sourceId === ref.sourceId);
-    if (selected) source.chapters = source.chapters.filter(c => selected.chapterIds.includes(c.chapterId));
-    return source;
-  });
+  const { version, sources } = sessionSources(db, library, scope, sessionId);
 
   const lines: string[] = [
     '你是「智学伴」的学习助教，帮助学生理解当前课程。',

@@ -6,7 +6,7 @@ vi.mock('server-only', () => ({}));
 vi.mock('node:dns/promises', () => ({ lookup: async () => [{ address: '8.8.8.8', family: 4 }] }));
 const callbacks: (() => Promise<void>)[] = [];
 vi.mock('next/server', () => ({ after: (fn: () => Promise<void>) => callbacks.push(fn) }));
-import { GET, POST, PATCH } from '@/app/api/verified-learning/v1/[[...path]]/route';
+import { DELETE, GET, POST, PATCH } from '@/app/api/verified-learning/v1/[[...path]]/route';
 import { initializeVerifiedLearning } from '@/lib/verified-learning/initialization';
 import { PREPROCESS_VERSION } from '@/lib/verified-learning/retrieval/from-settings';
 import { createEmbeddingProfile } from '@/lib/verified-learning/retrieval/profile';
@@ -44,6 +44,8 @@ async function upload(cookie: string) {
 }
 
 const embeddingHeader = (apiKey = 'sk-embed-test-secret') => Buffer.from(JSON.stringify({ baseUrl: 'https://api.example.com/v1', model: 'embed-mini', apiKey })).toString('base64url');
+const DELETE_BOOK = (bookId: string, expectedRevision: number, confirmName: string, cookie: string) =>
+  DELETE(request('DELETE', ['textbooks', bookId, 'deletion'], { expectedRevision, confirmName }, cookie), context(['textbooks', bookId, 'deletion']));
 
 describe('检索接口', () => {
   it('未配置 Embedding 时索引状态为 none，关键词检索仍可用', async () => {
@@ -81,7 +83,11 @@ describe('检索接口', () => {
     const status = await GET(request('GET', ['textbooks', book.bookId, 'retrieval-index'], undefined, cookie), context(['textbooks', book.bookId, 'retrieval-index']));
     const statusText = await status.text();
     expect(statusText).not.toContain('sk-embed-test-secret');
-    expect(JSON.parse(statusText).data).toMatchObject({ configured: true, model: 'embed-mini' });
+    expect(JSON.parse(statusText).data).toMatchObject({ status: 'succeeded', ready: 1, total: 1, usable: true, configured: true, model: 'embed-mini' });
+    // 建好索引后仍可正常彻底删除教材（不会因外键约束 500 崩溃）
+    const detail = (await (await GET(request('GET', ['textbooks', book.bookId], undefined, cookie), context(['textbooks', book.bookId]))).json()).data;
+    const del = await DELETE_BOOK(book.bookId, detail.revision, detail.title, cookie);
+    expect(del.status).toBe(200);
     const missing = await GET(request('GET', ['retrieval-jobs', 'not-exist'], undefined, cookie), context(['retrieval-jobs', 'not-exist']));
     expect(missing.status).toBe(404);
   });

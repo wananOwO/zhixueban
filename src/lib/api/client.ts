@@ -23,25 +23,50 @@ export interface ApiInit {
   body?: unknown;
   /** 幂等键：写操作重试时复用同一个值 */
   key?: string;
-  /** 线上模式：附加浏览器保存的模型配置（X-VL-Model） */
+  /** 线上模式：附加浏览器保存的模型配置（X-VL-Model；若存在 Embedding 配置也一并附带以支持混合检索） */
   modelHeader?: boolean;
+  /** 线上模式：附加浏览器保存的 Embedding 配置（X-VL-Embedding） */
+  embeddingHeader?: boolean;
+  /** 线上模式：附加浏览器保存的视觉配置（X-VL-Vision） */
+  visionHeader?: boolean;
   signal?: AbortSignal;
 }
 
 /** 由模型 Key 存储注册，避免请求层直接依赖存储实现 */
 let modelHeaderProvider: (() => string | null) | null = null;
+let embeddingHeaderProvider: (() => string | null) | null = null;
+let visionHeaderProvider: (() => string | null) | null = null;
+
 export function registerModelHeader(provider: (() => string | null) | null) {
   modelHeaderProvider = provider;
 }
 
+export function registerEmbeddingHeader(provider: (() => string | null) | null) {
+  embeddingHeaderProvider = provider;
+}
+
+export function registerVisionHeader(provider: (() => string | null) | null) {
+  visionHeaderProvider = provider;
+}
+
 export async function api<T>(path: string, init: ApiInit = {}): Promise<T> {
-  const { method = 'GET', body, key, modelHeader, signal } = init;
+  const { method = 'GET', body, key, modelHeader, embeddingHeader, visionHeader, signal } = init;
   const headers: Record<string, string> = {};
   if (body !== undefined && !(body instanceof FormData)) headers['Content-Type'] = 'application/json';
   if (key) headers['Idempotency-Key'] = key;
   if (modelHeader) {
     const value = modelHeaderProvider?.();
     if (value) headers['X-VL-Model'] = value;
+    const embValue = embeddingHeaderProvider?.();
+    if (embValue) headers['X-VL-Embedding'] = embValue;
+  }
+  if (embeddingHeader) {
+    const embValue = embeddingHeaderProvider?.();
+    if (embValue) headers['X-VL-Embedding'] = embValue;
+  }
+  if (visionHeader) {
+    const visValue = visionHeaderProvider?.();
+    if (visValue) headers['X-VL-Vision'] = visValue;
   }
   let response: Response;
   try {

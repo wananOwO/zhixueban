@@ -98,8 +98,11 @@ function resultSummary(message: { content?: unknown; isError?: boolean }): strin
   const text = Array.isArray(message.content) ? message.content.map(p => (p && typeof p === 'object' && 'text' in p && typeof p.text === 'string' ? p.text : '')).join('') : '';
   if (message.isError) return errorSignature(text);
   try {
-    const parsed = JSON.parse(text) as { paragraphs?: { paragraphIndex?: unknown }[] };
+    const parsed = JSON.parse(text) as { paragraphs?: { paragraphIndex?: unknown }[]; total?: unknown; keywordCount?: unknown; vectorCount?: unknown; degraded?: unknown };
     if (Array.isArray(parsed.paragraphs)) return JSON.stringify({ paragraphs: parsed.paragraphs.map(p => ({ paragraphIndex: p.paragraphIndex })) });
+    if (typeof parsed.total === 'number' && typeof parsed.keywordCount === 'number' && typeof parsed.vectorCount === 'number') {
+      return JSON.stringify({ total: parsed.total, keywordCount: parsed.keywordCount, vectorCount: parsed.vectorCount, degraded: parsed.degraded === true });
+    }
   } catch { /* 非 JSON 结果不保留 */ }
   return '';
 }

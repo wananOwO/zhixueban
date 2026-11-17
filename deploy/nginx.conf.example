@@ -1,7 +1,7 @@
 # Nginx 站点配置样例：/etc/nginx/conf.d/zhixueban.conf
 # 把 learn.example.cn 换成已备案域名；证书路径换成实际签发的证书。
 
-# 访问日志不记录 Cookie 与请求头（默认 combined 格式本就不含，这里显式声明）
+# 访问日志不记录 Cookie 与请求头（防止 X-VL-Model / X-VL-Embedding / X-VL-Vision 进入访问日志）
 log_format zhixueban '$remote_addr - [$time_local] "$request_method $uri" $status $body_bytes_sent $request_time';
 
 server {
@@ -25,7 +25,11 @@ server {
 
     access_log /var/log/nginx/zhixueban.access.log zhixueban;
 
-    # 上传上限：线上每本 20 MiB，留 1 MiB 给表单开销
+    # 请求头缓冲上限：支持同时携带 X-VL-Model、X-VL-Embedding、X-VL-Vision（各上限 8 KiB）与 Cookie，拒绝超长请求头
+    client_header_buffer_size 16k;
+    large_client_header_buffers 4 32k;
+
+    # 上传上限：线上教材每本 20 MiB（留 1 MiB 表单开销）；截图接口在应用层流式限制 5 MiB
     client_max_body_size 21m;
 
     location / {
@@ -38,8 +42,8 @@ server {
         proxy_read_timeout 120s;
     }
 
-    # 任务事件流（SSE）与助教流式回答：关闭缓冲，长连接
-    location ~ ^/api/verified-learning/v1/(jobs/[^/]+/stream|sessions/[^/]+/tutor)$ {
+    # 任务事件流（SSE）、助教流式回答与截图流式讲解：关闭缓冲，长连接
+    location ~ ^/api/verified-learning/v1/(jobs/[^/]+/stream|sessions/[^/]+/(tutor|vision/explain))$ {
         proxy_pass http://127.0.0.1:3101;
         proxy_http_version 1.1;
         proxy_set_header Host $host;

@@ -64,6 +64,12 @@ function LearnBody({ view, focusPoint }: { view: SessionView; focusPoint?: strin
   const activityPoints = (run?.activity.knowledgePointIds ?? next.pointIds).map(id => points.find(p => p.knowledgePointId === id)).filter(Boolean) as CoursePointView[];
   const heading = activityPoints.map(p => p.title).join('、') || title;
   const titles = useMemo(() => Object.fromEntries((books.data ?? []).map(b => [b.bookId, b.title])), [books.data]);
+  const allowedPracticePoints = useMemo(() => {
+    const allowedSet = new Set(view.allowedKnowledgePointIds ?? []);
+    return points
+      .filter(p => allowedSet.has(p.knowledgePointId))
+      .map(p => ({ id: p.knowledgePointId, title: p.title }));
+  }, [points, view.allowedKnowledgePointIds]);
 
   const [drawer, setDrawer] = useState<SourceTarget | null>(null);
   const [side, setSide] = useState<'notes' | 'tutor'>('notes');
@@ -90,6 +96,9 @@ function LearnBody({ view, focusPoint }: { view: SessionView; focusPoint?: strin
       onClearSelection={() => setSelection(null)}
       titles={titles}
       chapterOf={chapterOf}
+      allowedPoints={allowedPracticePoints}
+      hasActiveRun={Boolean(run)}
+      onPracticeCreated={refresh}
       onOpen={setDrawer}
       onClose={onClose}
     />
@@ -343,6 +352,15 @@ function ActivityBody({ view, run, runView, runError, onRetry, progress, titles,
     mutationFn: () => api<SessionView>(`/sessions/${encodeURIComponent(sessionId)}/lesson-completion`, { method: 'POST', body: { runId: run.runId, expectedRevision: view.session.revision }, key: newKey() }),
     onSuccess: onDone,
   });
+  const isVisionPractice = run.purpose === 'vision_practice';
+  const abandonPractice = useMutation({
+    mutationFn: () => api<SessionView>(`/sessions/${encodeURIComponent(sessionId)}/abandon`, {
+      method: 'POST',
+      body: { runId: run.runId, expectedRevision: view.session.revision },
+      key: newKey(),
+    }),
+    onSuccess: onDone,
+  });
 
   if (runError) return <BlockError className="mt-6" error={runError} onRetry={onRetry} />;
   if (!runView) return <BlockLoading className="mt-6" lines={10} label="正在读取内容" />;
@@ -384,12 +402,30 @@ function ActivityBody({ view, run, runView, runError, onRetry, progress, titles,
 
   return (
     <>
-      <p className="mt-2 text-sm text-muted">{ACTIVITY_LABEL[run.activity.kind]} · {runView.questions.length} 题。题目由 Agent 出题并审校，答案在你提交后才显示。</p>
-      <EvidenceBar points={run.activity.knowledgePointIds} progress={progress} view={view} />
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-sm text-muted">
+        <p>
+          {isVisionPractice
+            ? '截图变式练习 · 1 题（独立审校通过，用于巩固理解，不推进课程进度、不计入掌握证据）。'
+            : `${ACTIVITY_LABEL[run.activity.kind]} · ${runView.questions.length} 题。题目由 Agent 出题并审校，答案在你提交后才显示。`}
+        </p>
+        {isVisionPractice && runView.status !== 'completed' && (
+          <Button size="sm" variant="ghost" disabled={abandonPractice.isPending} onClick={() => abandonPractice.mutate()}>
+            退出变式练习
+          </Button>
+        )}
+      </div>
+      {!isVisionPractice && <EvidenceBar points={run.activity.knowledgePointIds} progress={progress} view={view} />}
       <div className="mt-6 -mx-6 bg-ground px-6 py-5 max-md:-mx-4 max-md:px-4">
         <QuestionSet runId={run.runId} questions={runView.questions} savedAnswers={cursor?.answers} onAnswersChange={saveAnswers} onAnswered={onDone} />
       </div>
-      {runView.status === 'completed' && <p className="mt-5 text-base">本组题已全部判分。<Link href={`/learn/${encodeURIComponent(sessionId)}`} className="font-medium underline underline-offset-4" onClick={onDone}>继续下一步</Link></p>}
+      {runView.status === 'completed' && (
+        <p className="mt-5 text-base">
+          {isVisionPractice ? '变式练习已完成判分（不改变课程进度）。' : '本组题已全部判分。'}
+          <Link href={`/learn/${encodeURIComponent(sessionId)}`} className="ml-1 font-medium underline underline-offset-4" onClick={onDone}>
+            {isVisionPractice ? '返回课程主线' : '继续下一步'}
+          </Link>
+        </p>
+      )}
     </>
   );
 }

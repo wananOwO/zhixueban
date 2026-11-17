@@ -21,12 +21,16 @@ export async function mockApi(page: Page, routes: Record<string, Handler>, calls
       try { body = request.postDataJSON(); } catch { body = request.postData(); }
     }
     calls.push({ method, path, body, headers: request.headers() });
-    const key = Object.keys(routes).find(pattern => {
+    const keys = [...Object.keys(routes)].reverse();
+    const matchPattern = (pattern: string) => {
       const [m, p] = pattern.split(' ');
       if (m !== method) return false;
       const regex = new RegExp(`^${p.replace(/:[^/]+/g, '[^/]+')}$`);
       return regex.test(path);
-    });
+    };
+    const key =
+      keys.find(pattern => !pattern.includes(':') && matchPattern(pattern)) ??
+      keys.find(matchPattern);
     if (!key) {
       await route.fulfill({ status: 404, json: { contractVersion: 1, requestId: 'e2e', error: { code: 'NOT_FOUND', message: `未模拟的接口 ${method} ${path}` } } });
       return;
@@ -52,6 +56,28 @@ export const baseRoutes: Record<string, Handler> = {
   'GET /jobs': () => ({ data: [] }),
   'GET /courses': () => ({ data: [] }),
   'GET /drafts': () => ({ data: [] }),
+  'GET /textbooks/:id/retrieval-index': () => ({
+    data: {
+      status: 'none',
+      profileId: null,
+      ready: 0,
+      failed: 0,
+      total: 0,
+      paragraphCount: 20,
+      charCount: 1200,
+      baseUrl: null,
+      jobId: null,
+      usable: false,
+      resumable: false,
+      leaseExpired: false,
+      error: null,
+      configured: false,
+      model: null,
+    },
+  }),
+  'POST /sessions/:id/retrieve': () => ({
+    data: { hits: [], degraded: false, keywordCount: 0, vectorCount: 0 },
+  }),
 };
 
 export const book = (overrides: Partial<Record<string, unknown>> = {}) => ({

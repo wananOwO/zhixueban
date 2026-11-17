@@ -22,21 +22,45 @@ interface Form {
   embeddingModel: string;
   embeddingBaseUrl: string;
   embeddingApiKey: string;
+  visionProvider: Provider;
+  visionModel: string;
+  visionBaseUrl: string;
+  visionApiKey: string;
 }
-const EMPTY: Form = { provider: 'openai-compatible', baseUrl: '', apiKey: '', model: '', embeddingModel: '', embeddingBaseUrl: '', embeddingApiKey: '' };
-const DEFAULT_BASE: Record<Provider, string> = { 'openai-compatible': 'https://api.deepseek.com/v1', anthropic: 'https://api.anthropic.com/v1' };
+const EMPTY: Form = {
+  provider: 'openai-compatible',
+  baseUrl: '',
+  apiKey: '',
+  model: '',
+  embeddingModel: '',
+  embeddingBaseUrl: '',
+  embeddingApiKey: '',
+  visionProvider: 'openai-compatible',
+  visionModel: '',
+  visionBaseUrl: '',
+  visionApiKey: '',
+};
+const DEFAULT_BASE: Record<Provider, string> = {
+  'openai-compatible': 'https://api.deepseek.com/v1',
+  anthropic: 'https://api.anthropic.com/v1',
+};
 
 /**
- * 设置：模型供应商、地址、Key、模型。
+ * 设置：聊天/Agent 模型、Embedding 语义检索模型、截图视觉模型。
  * 本地模式保存到本机数据库（Key 留空表示保持原值，不回显）；
- * 线上模式只保存在这个浏览器（localStorage），服务器只在需要模型的请求里临时使用。
+ * 线上模式只保存在这个浏览器（localStorage），按 X-VL-Model / X-VL-Embedding / X-VL-Vision 分头发送，服务器只放内存。
  */
 export function SettingsPage() {
   const mode = useMode();
   const online = mode.data?.mode === 'online';
   return (
     <>
-      <PageHeader title="设置" description={online ? '生成课程、课件、题目和助教回答都用你自己的模型 Key。' : '本机使用的模型供应商。网页设置优先于环境变量；Key 只保存在本机数据库，不回显。'} />
+      <PageHeader
+        title="设置"
+        description={online
+          ? '生成课程、课件、题目、语义检索与截图识别都使用你自己的模型 Key（只保存在本浏览器）。'
+          : '本机使用的模型供应商。网页设置优先于环境变量；Key 只保存在本机数据库，不回显。'}
+      />
       <div className="mt-6 grid gap-6">
         {mode.isPending ? <Section title="模型供应商"><BlockLoading lines={6} /></Section> : online ? <OnlineForm /> : <LocalForm />}
         {!mode.isPending && !online && <ObsidianForm />}
@@ -60,6 +84,76 @@ function Section({ title, description, children, labelledBy }: { title: string; 
   );
 }
 
+function ExtraModelSections({
+  form,
+  onChange,
+  embeddingConfigured,
+  visionConfigured,
+  online,
+}: {
+  form: Form;
+  onChange: (patch: Partial<Form>) => void;
+  embeddingConfigured: boolean;
+  visionConfigured: boolean;
+  online: boolean;
+}) {
+  return (
+    <>
+      <fieldset className="grid gap-4 border-t border-rule pt-5">
+        <legend className="text-sm text-muted">资料检索用的 Embedding（可选，未填时使用关键词检索）</legend>
+        <div className="grid grid-cols-3 gap-4 max-xl:grid-cols-1">
+          <Field label="Embedding 模型" htmlFor="emb-model">
+            <Input id="emb-model" value={form.embeddingModel} maxLength={300} placeholder="text-embedding-3-small" onChange={e => onChange({ embeddingModel: e.target.value })} />
+          </Field>
+          <Field label="Embedding 地址" htmlFor="emb-base">
+            <Input id="emb-base" value={form.embeddingBaseUrl} maxLength={2000} placeholder="留空复用上面的 API 地址" onChange={e => onChange({ embeddingBaseUrl: e.target.value })} />
+          </Field>
+          <Field label="Embedding Key" htmlFor="emb-key">
+            <Input
+              id="emb-key"
+              type="password"
+              autoComplete="new-password"
+              value={form.embeddingApiKey}
+              maxLength={4096}
+              placeholder={!online && embeddingConfigured ? '已配置，留空保持原值' : '留空复用上面的 Key'}
+              onChange={e => onChange({ embeddingApiKey: e.target.value })}
+            />
+          </Field>
+        </div>
+      </fieldset>
+
+      <fieldset className="grid gap-4 border-t border-rule pt-5">
+        <legend className="text-sm text-muted">截图提问用的视觉模型（可选，留空复用聊天模型）</legend>
+        <div className="grid grid-cols-2 gap-4 max-xl:grid-cols-1">
+          <Field label="视觉协议" htmlFor="vis-provider">
+            <Select id="vis-provider" value={form.visionProvider} onChange={e => onChange({ visionProvider: e.target.value as Provider })}>
+              <option value="openai-compatible">OpenAI 兼容（GPT-4o、Qwen-VL、GLM-4V 等）</option>
+              <option value="anthropic">Anthropic Claude Vision</option>
+            </Select>
+          </Field>
+          <Field label="视觉模型" htmlFor="vis-model">
+            <Input id="vis-model" value={form.visionModel} maxLength={300} placeholder="留空默认复用聊天模型" onChange={e => onChange({ visionModel: e.target.value })} />
+          </Field>
+          <Field label="视觉地址" htmlFor="vis-base">
+            <Input id="vis-base" value={form.visionBaseUrl} maxLength={2000} placeholder="留空复用上面的 API 地址" onChange={e => onChange({ visionBaseUrl: e.target.value })} />
+          </Field>
+          <Field label="视觉 Key" htmlFor="vis-key">
+            <Input
+              id="vis-key"
+              type="password"
+              autoComplete="new-password"
+              value={form.visionApiKey}
+              maxLength={4096}
+              placeholder={!online && visionConfigured ? '已配置，留空保持原值' : '留空复用上面的 Key'}
+              onChange={e => onChange({ visionApiKey: e.target.value })}
+            />
+          </Field>
+        </div>
+      </fieldset>
+    </>
+  );
+}
+
 function LocalForm() {
   const client = useQueryClient();
   const settings = useQuery(listQueries.settings());
@@ -76,34 +170,63 @@ function LocalForm() {
       embeddingModel: String(s.embedding_model ?? ''),
       embeddingBaseUrl: String(s.embedding_base_url ?? ''),
       embeddingApiKey: '',
+      visionProvider: (s.vision_provider as Provider) || 'openai-compatible',
+      visionModel: String(s.vision_model ?? ''),
+      visionBaseUrl: String(s.vision_base_url ?? ''),
+      visionApiKey: '',
     });
   }, [settings.data]);
   const save = useMutation({
     mutationFn: () => api<SettingsView>('/settings', {
       method: 'PATCH',
       body: {
-        llm_provider: form.provider, llm_base_url: form.baseUrl, llm_api_key: form.apiKey, llm_model: form.model,
-        embedding_model: form.embeddingModel, embedding_base_url: form.embeddingBaseUrl, embedding_api_key: form.embeddingApiKey,
+        llm_provider: form.provider,
+        llm_base_url: form.baseUrl,
+        llm_api_key: form.apiKey,
+        llm_model: form.model,
+        embedding_model: form.embeddingModel,
+        embedding_base_url: form.embeddingBaseUrl,
+        embedding_api_key: form.embeddingApiKey,
+        ...(form.visionModel.trim() || form.visionBaseUrl.trim() || form.visionApiKey.trim()
+          ? {
+              vision_provider: form.visionProvider,
+              vision_model: form.visionModel,
+              vision_base_url: form.visionBaseUrl,
+              vision_api_key: form.visionApiKey,
+            }
+          : {
+              vision_model: '',
+              vision_base_url: '',
+            }),
       },
     }),
-    onSuccess: data => { client.setQueryData(queryKeys.settings(), data); setMessage('已保存，之后的模型请求立即使用新配置。'); },
+    onSuccess: data => {
+      client.setQueryData(queryKeys.settings(), data);
+      setMessage('已保存，之后的模型请求立即使用新配置。');
+    },
   });
   if (settings.isPending) return <Section title="模型供应商"><BlockLoading lines={6} label="正在读取设置" /></Section>;
   if (settings.error) return <Section title="模型供应商"><BlockError error={settings.error} onRetry={() => void settings.refetch()} /></Section>;
   const configured = settings.data?.llm_api_key_configured === true;
   const embeddingConfigured = settings.data?.embedding_api_key_configured === true;
+  const visionConfigured = settings.data?.vision_api_key_configured === true;
   return (
     <Section title="模型供应商" description="更换供应商时请同时核对地址、Key 和模型。地址留空使用环境变量或协议默认值。这里只保存配置，不会发起付费调用。">
       <form className="grid gap-5" onSubmit={event => { event.preventDefault(); setMessage(''); save.mutate(); }}>
-        <ProviderFields form={form} onChange={patch => { setForm(f => ({ ...f, ...patch })); setMessage(''); }} keyHint={configured ? '已配置；留空保持原值，输入新值替换' : '未配置'} keyPlaceholder={configured ? '已配置，留空保持原值' : 'sk-…'} online={false} />
-        <fieldset className="grid gap-4 border-t border-rule pt-5">
-          <legend className="text-sm text-muted">资料检索用的 Embedding（可选）</legend>
-          <div className="grid grid-cols-3 gap-4 max-xl:grid-cols-1">
-            <Field label="Embedding 模型" htmlFor="emb-model"><Input id="emb-model" value={form.embeddingModel} maxLength={300} placeholder="text-embedding-3-small" onChange={e => setForm(f => ({ ...f, embeddingModel: e.target.value }))} /></Field>
-            <Field label="Embedding 地址" htmlFor="emb-base"><Input id="emb-base" value={form.embeddingBaseUrl} maxLength={2000} placeholder="留空使用上面的地址" onChange={e => setForm(f => ({ ...f, embeddingBaseUrl: e.target.value }))} /></Field>
-            <Field label="Embedding Key" htmlFor="emb-key"><Input id="emb-key" type="password" autoComplete="new-password" value={form.embeddingApiKey} maxLength={4096} placeholder={embeddingConfigured ? '已配置，留空保持原值' : '留空使用上面的 Key'} onChange={e => setForm(f => ({ ...f, embeddingApiKey: e.target.value }))} /></Field>
-          </div>
-        </fieldset>
+        <ProviderFields
+          form={form}
+          onChange={patch => { setForm(f => ({ ...f, ...patch })); setMessage(''); }}
+          keyHint={configured ? '已配置；留空保持原值，输入新值替换' : '未配置'}
+          keyPlaceholder={configured ? '已配置，留空保持原值' : 'sk-…'}
+          online={false}
+        />
+        <ExtraModelSections
+          form={form}
+          onChange={patch => { setForm(f => ({ ...f, ...patch })); setMessage(''); }}
+          embeddingConfigured={embeddingConfigured}
+          visionConfigured={visionConfigured}
+          online={false}
+        />
         <BlockError error={save.error} />
         <div className="flex flex-wrap items-center gap-4">
           <Button type="submit" variant="primary" disabled={save.isPending}>{save.isPending && <Loader2 className="animate-spin" aria-hidden />}保存设置</Button>
@@ -144,36 +267,98 @@ function ObsidianForm() {
 
 function OnlineForm() {
   const config = useModelKey(state => state.config);
+  const embedding = useModelKey(state => state.embedding);
+  const vision = useModelKey(state => state.vision);
   const setConfig = useModelKey(state => state.set);
+  const setEmbedding = useModelKey(state => state.setEmbedding);
+  const setVision = useModelKey(state => state.setVision);
   const clear = useModelKey(state => state.clear);
   const [form, setForm] = useState<Form>(EMPTY);
   const [message, setMessage] = useState('');
-  // localStorage 只在浏览器可读：挂载后从存储填表
+
   useEffect(() => {
-    setForm(f => (config ? { ...f, provider: config.provider, baseUrl: config.baseUrl, apiKey: config.apiKey, model: config.model } : { ...EMPTY }));
-  }, [config]);
+    setForm({
+      provider: config?.provider ?? 'openai-compatible',
+      baseUrl: config?.baseUrl ?? '',
+      apiKey: config?.apiKey ?? '',
+      model: config?.model ?? '',
+      embeddingModel: embedding?.model ?? '',
+      embeddingBaseUrl: embedding?.baseUrl ?? '',
+      embeddingApiKey: embedding?.apiKey ?? '',
+      visionProvider: vision?.provider ?? 'openai-compatible',
+      visionModel: vision?.model ?? '',
+      visionBaseUrl: vision?.baseUrl ?? '',
+      visionApiKey: vision?.apiKey ?? '',
+    });
+  }, [config, embedding, vision]);
+
   const complete = form.apiKey.trim() && form.model.trim();
+  const hasAnySaved = Boolean(config || embedding || vision);
+
   return (
     <>
       <div className="rounded-[var(--radius-paper)] bg-zhu-tint px-6 py-4 text-base">
         <p className="font-medium text-ink">Key 只保存在这个浏览器里，服务器不写入任何文件。</p>
-        <p className="mt-1 text-ink-soft">需要模型的请求会临时带上它：生成课程与内容时服务器只放在内存里，任务结束即删除。共用电脑用完请点「清除 Key」。</p>
+        <p className="mt-1 text-ink-soft">需要模型的请求会临时带上对应请求头（聊天、Embedding、视觉各自独立）：服务器只在内存中使用，任务结束即删除。共用电脑用完请点「清除 Key」。</p>
       </div>
-      <Section title="模型供应商" description="填你自己的 Key。费用由你的账户承担：一次课程方案生成约几十到一百次模型请求。">
+      <Section title="模型供应商" description="填你自己的 Key。费用由你的账户承担：课程生成、语义索引与截图识别都只在你明确操作后调用。">
         <form
           className="grid gap-5"
           onSubmit={event => {
             event.preventDefault();
             if (!complete) return;
-            setConfig({ provider: form.provider, baseUrl: form.baseUrl.trim() || DEFAULT_BASE[form.provider], apiKey: form.apiKey.trim(), model: form.model.trim() });
+            const mainBase = form.baseUrl.trim() || DEFAULT_BASE[form.provider];
+            const mainKey = form.apiKey.trim();
+            setConfig({ provider: form.provider, baseUrl: mainBase, apiKey: mainKey, model: form.model.trim() });
+
+            if (form.embeddingModel.trim()) {
+              setEmbedding({
+                baseUrl: form.embeddingBaseUrl.trim() || mainBase,
+                apiKey: form.embeddingApiKey.trim() || mainKey,
+                model: form.embeddingModel.trim(),
+              });
+            } else {
+              setEmbedding(null);
+            }
+
+            if (form.visionModel.trim()) {
+              const visionFallbackBase = form.visionProvider === form.provider ? mainBase : DEFAULT_BASE[form.visionProvider];
+              setVision({
+                provider: form.visionProvider,
+                baseUrl: form.visionBaseUrl.trim() || visionFallbackBase,
+                apiKey: form.visionApiKey.trim() || mainKey,
+                model: form.visionModel.trim(),
+              });
+            } else {
+              setVision(null);
+            }
             setMessage('已保存到本浏览器。');
           }}
         >
-          <ProviderFields form={form} onChange={patch => { setForm(f => ({ ...f, ...patch })); setMessage(''); }} keyHint={config ? '已保存在本浏览器' : '必填'} keyPlaceholder="sk-…" online />
+          <ProviderFields
+            form={form}
+            onChange={patch => { setForm(f => ({ ...f, ...patch })); setMessage(''); }}
+            keyHint={config ? '已保存在本浏览器' : '必填'}
+            keyPlaceholder="sk-…"
+            online
+          />
+          <ExtraModelSections
+            form={form}
+            onChange={patch => { setForm(f => ({ ...f, ...patch })); setMessage(''); }}
+            embeddingConfigured={Boolean(embedding)}
+            visionConfigured={Boolean(vision)}
+            online
+          />
           <div className="flex flex-wrap items-center gap-4">
             <Button type="submit" variant="primary" disabled={!complete}>保存到本浏览器</Button>
-            {config && (
-              <ConfirmButton title="清除这个浏览器里的模型 Key？" description="清除后需要重新填写才能生成内容或使用助教。已生成的课程不受影响。" confirmLabel="清除" danger onConfirm={() => { clear(); setMessage('已清除。'); }}>
+            {hasAnySaved && (
+              <ConfirmButton
+                title="清除这个浏览器里的全部模型 Key？"
+                description="清除后将同时移除聊天、Embedding 与视觉模型配置；已生成的课程不受影响。"
+                confirmLabel="清除"
+                danger
+                onConfirm={() => { clear(); setMessage('已清除。'); }}
+              >
                 清除 Key
               </ConfirmButton>
             )}
@@ -198,7 +383,6 @@ function ProviderFields({ form, onChange, keyHint, keyPlaceholder, online }: {
   const list = useMutation({
     mutationFn: () => {
       if (online) {
-        // 线上：用当前表单内容（未保存也可）作为 X-VL-Model，请求体不带 Key
         const header = encodeConfig({ provider: form.provider, baseUrl: form.baseUrl.trim() || DEFAULT_BASE[form.provider], apiKey: form.apiKey.trim(), model: form.model.trim() || 'list' });
         return fetchModels({}, header);
       }
@@ -263,7 +447,6 @@ function encodeConfig(config: BrowserModelConfig): string {
 
 async function fetchModels(body: object, header?: string): Promise<{ models: { id: string; name: string }[]; truncated: boolean }> {
   if (!header) return api('/settings/models', { method: 'POST', body });
-  // api() 的 modelHeader 取已保存的配置；这里要用表单里的，所以直接发请求
   const response = await fetch('/api/verified-learning/v1/settings/models', {
     method: 'POST',
     credentials: 'same-origin',
@@ -295,4 +478,3 @@ function JudgeStatus() {
     </Section>
   );
 }
-

@@ -85,4 +85,61 @@ describe('索引任务', () => {
     expect(() => store.get('other', job.jobId)).toThrow(expect.objectContaining({ code: 'NOT_FOUND' }));
     db.close();
   });
+
+  it('达到批次请求上限时进入 waiting_user 且记录真实请求计数（不产生 NaN）', async () => {
+    const { db, store } = await fresh();
+    const manyParagraphs: SourceSnapshot = {
+      ...source,
+      sourceRevision: 'rev-many',
+      chapters: [{ chapterId: 'chapter', title: '章节', paragraphs: Array.from({ length: 40 }, (_, i) => ({ paragraphIndex: i, text: `段落 ${i}`, contentHash: `h-${i}` })) }],
+    };
+    db.prepare(`INSERT INTO vl_source_revisions(scope_id,book_id,source_revision,snapshot_json,created_at) VALUES ('scope','book','rev-many',?,'t')`).run(JSON.stringify(manyParagraphs));
+    const job = store.create({ scopeId: 'scope', key: 'k-budget', source: manyParagraphs, profile });
+    let calls = 0;
+    const paused = await store.run({ scopeId: 'scope', jobId: job.jobId, source: manyParagraphs, profile }, { embed: async values => { calls++; return values.map(() => [1, 0]); } }, { maxRequests: 2 });
+    expect(calls).toBe(2);
+    expect(paused.status).toBe('waiting_user');
+    expect(paused.progress.requests).toBe(2);
+    expect(paused.progress.ready).toBe(32);
+    expect(paused.resumable).toBe(true);
+    db.close();
+  });
+
+  it('网络等待期间失去租约或被取消时，返回后绝不写入向量', async () => {
+    const { db, store } = await fresh();
+    const job = store.create({ scopeId: 'scope', key: 'k-cancel-mid', source, profile });
+    await store.run({ scopeId: 'scope', jobId: job.jobId, source, profile }, {
+      embed: async values => {
+        store.cancel('scope', job.jobId);
+        return values.map(() => [1, 0]);
+      },
+    });
+    expect(store.get('scope', job.jobId).status).toBe('cancelled');
+    expect((db.prepare("SELECT count(*) AS n FROM vl_retrieval_vectors WHERE scope_id='scope'").get() as { n: number }).n).toBe(0);
+    db.close();
+  });
+
+  it('401 鉴权失败不重试，暂时性故障最多退避重试 2 次', async () => {
+    const { db, store } = await fresh();
+    const authJob = store.create({ scopeId: 'scope', key: 'k-auth', source, profile });
+    let authCalls = 0;
+    await store.run({ scopeId: 'scope', jobId: authJob.jobId, source, profile }, {
+      embed: async () => { authCalls++; throw new Error('Embedding 服务返回 HTTP 401'); },
+    }, { retryDelayMs: 1 });
+    expect(authCalls).toBe(1);
+
+    const transientProfile = createEmbeddingProfile({ provider: 'openai-compatible', baseUrl: 'https://api.example.com/v1', model: 'embed-2' }, 'v1');
+    const transientJob = store.create({ scopeId: 'scope', key: 'k-transient', source, profile: transientProfile });
+    let transientCalls = 0;
+    await store.run({ scopeId: 'scope', jobId: transientJob.jobId, source, profile: transientProfile }, {
+      embed: async values => {
+        transientCalls++;
+        if (transientCalls < 3) throw new Error('Embedding 服务返回 HTTP 503');
+        return values.map(() => [1, 0]);
+      },
+    }, { retryDelayMs: 1 });
+    expect(transientCalls).toBe(3);
+    expect(store.get('scope', transientJob.jobId).status).toBe('succeeded');
+    db.close();
+  });
 });

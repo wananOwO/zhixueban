@@ -136,6 +136,12 @@ export class LibraryService {
         const input=JSON.parse(draft.input_json);if(input.textbookId===id||input.sources?.some((s:{sourceId:string})=>s.sourceId===id))blockers.push({kind:'draft',id:draft.draft_id});
       }
     }
+    if(this.db.prepare("SELECT 1 FROM sqlite_master WHERE name='vl_index_jobs'").get()) {
+      const now=new Date().toISOString();
+      for(const job of this.db.prepare("SELECT job_id,status,lease_until FROM vl_index_jobs WHERE scope_id=? AND book_id=? AND status IN ('queued','running')").all(scope,id) as {job_id:string;status:string;lease_until:string|null}[]){
+        if(job.status==='queued'||(job.lease_until??'')>now)blockers.push({kind:'index',id:job.job_id});
+      }
+    }
 
     return {bookId:id,revision:row.revision,blocked:blockers.length>0,blockers};
   }
@@ -158,6 +164,11 @@ export class LibraryService {
     }
     try { this.db.transaction(()=>{
       if(this.inspectDeletion(scope,id).blocked)throw new LearningError('VALIDATION_FAILED','教材新增关联，停止删除');
+      for(const table of ['vl_index_jobs','vl_retrieval_vectors','vl_retrieval_chunks']){
+        if(this.db.prepare("SELECT 1 FROM sqlite_master WHERE name=?").get(table)){
+          this.db.prepare(`DELETE FROM ${table} WHERE scope_id=? AND book_id=?`).run(scope,id);
+        }
+      }
       this.db.prepare('DELETE FROM vl_source_revisions WHERE scope_id=? AND book_id=?').run(scope,id);
       this.db.prepare('DELETE FROM vl_books WHERE scope_id=? AND book_id=?').run(scope,id);
     }).immediate();

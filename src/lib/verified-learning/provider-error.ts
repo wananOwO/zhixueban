@@ -11,8 +11,19 @@ export class ProviderResponseError extends Error {
 }
 
 export function redact(message: string): string {
-  // 线上模式的 Key 只在内存里，同样要从任何对外文本中遮蔽
-  for (const secret of [getConfig('llm_api_key'), process.env.LLM_API_KEY, process.env.VERIFIED_LEARNING_ACCESS_TOKEN, process.env.VL_ACCESS_CODE, ...allSecrets()]) {
+  // 线上模式的 Key 只在内存里，本地模式的聊天/Embedding/视觉 Key 也统一从任何对外文本中遮蔽
+  const candidates = [
+    getConfig('llm_api_key'),
+    getConfig('embedding_api_key'),
+    getConfig('vision_api_key'),
+    process.env.LLM_API_KEY,
+    process.env.EMBEDDING_API_KEY,
+    process.env.VISION_API_KEY,
+    process.env.VERIFIED_LEARNING_ACCESS_TOKEN,
+    process.env.VL_ACCESS_CODE,
+    ...allSecrets(),
+  ];
+  for (const secret of candidates) {
     if (secret) {
       message = message.split(secret).join('[已隐藏]');
       message = message.split(JSON.stringify(secret).slice(1, -1)).join('[已隐藏]');

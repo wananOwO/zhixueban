@@ -105,7 +105,7 @@ pnpm vl:sample-export --db data/<一次性库>.db --scope local-owner --course <
 
 3. 把 `course.json` 放到 `/srv/zhixueban/data/sample/course.json`（`env.example` 里的 `VL_SAMPLE_PATH` 已指向它），然后 `sudo systemctl restart zhixueban`。
 
-导出内容：课程版本与审核记录、用到的资料快照（不带上传文件）、重置为未开始的学习会话、已生成的课件与题组、生成任务的结果与轨迹。轨迹只保留工具名、读取区间、搜索词、引用段号等，不含提示词与模型原文。不导出作答、笔记和其他草稿。未配置 `VL_SAMPLE_PATH` 或文件不存在时跳过，线上站照常可用。
+导出内容：课程版本与审核记录、用到的资料快照（不带上传文件）、重置为未开始的学习会话、已生成的课件与题组、生成任务的结果与轨迹。轨迹只保留工具名、读取区间、搜索词与检索统计、引用段号等，不含提示词与模型原文。默认不导出派生检索向量（`vl_retrieval_vectors`）、索引任务（`vl_index_jobs`）、作答、笔记和其他草稿；新空间免 Key 浏览不会自动触发付费索引。未配置 `VL_SAMPLE_PATH` 或文件不存在时跳过，线上站照常可用。
 
 ## 七、备份
 

@@ -10,6 +10,10 @@ const config: NextConfig = {
         source: '/api/verified-learning/v1/jobs/:id/stream',
         headers: [{ key: 'X-Accel-Buffering', value: 'no' }],
       },
+      {
+        source: '/api/verified-learning/v1/sessions/:id/vision/explain',
+        headers: [{ key: 'X-Accel-Buffering', value: 'no' }],
+      },
     ];
   },
 };

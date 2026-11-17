@@ -8,6 +8,7 @@ export interface TraceStep {
   ok: boolean;
   read?: { sourceId: string; chapterId: string; from: number; to: number };
   search?: string;
+  searchStats?: { total: number; keywordCount: number; vectorCount: number; degraded: boolean };
   cites?: { sourceId: string; paragraphIndex: number }[];
   section?: string;
   question?: number;
@@ -66,7 +67,14 @@ export function mergeTraces(traces: (TraceView | undefined)[]): TraceView {
 /** 执行记录一行的说明：在事件标题后补上轨迹里的细节（搜索词、读取范围） */
 export function describeStep(step: TraceStep, titleOf: (sourceId: string) => string): string {
   if (step.read) return `${step.label}：${titleOf(step.read.sourceId)} 第 ${step.read.from}–${step.read.to} 段`;
-  if (step.search) return `${step.label}：「${step.search}」`;
+  if (step.search) {
+    const s = step.searchStats;
+    if (s && (s.vectorCount > 0 || s.degraded)) {
+      return `${step.label}：「${step.search}」· 混合检索找到 ${s.total} 个候选段落（关键词 ${s.keywordCount} 个，语义 ${s.vectorCount} 个${s.degraded ? '，已降级关键词' : ''}）`;
+    }
+    if (s) return `${step.label}：「${step.search}」· 关键词找到 ${s.total} 个候选段落`;
+    return `${step.label}：「${step.search}」`;
+  }
   if (step.url) return `${step.label}：${step.url}`;
   if (step.question) return `${step.label}：第 ${step.question} 题`;
   if (step.section && step.cites?.length) return `${step.label}：引用原文 ${step.cites.length} 处`;

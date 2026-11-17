@@ -43,23 +43,28 @@ test.describe('设置页', () => {
     await expect(page.getByLabel('vault 文件夹')).toHaveCount(0);
   });
 
-  test('线上模式：保存不发 PATCH，写入 localStorage；清除后为空', async ({ page }) => {
+  test('线上模式：保存不发 PATCH，聊天/Embedding/视觉配置写入 localStorage；清除后为空', async ({ page }) => {
     const calls = await mockApi(page, { ...baseRoutes, ...online, ...judgeOk, 'GET /settings': () => ({ data: { llm_provider: 'openai-compatible', online: true } }) });
     await page.goto('/settings');
     await expect(page.getByText('Key 只保存在这个浏览器里')).toBeVisible();
-    await expect(page.getByLabel('Embedding 模型')).toHaveCount(0);
     await page.getByLabel('API 地址').fill('https://api.deepseek.com/v1');
     await page.getByLabel('API Key', { exact: true }).fill('sk-test-online');
     await page.getByLabel('模型名称').fill('deepseek-chat');
+    await page.getByLabel('Embedding 模型').fill('text-embedding-3-small');
+    await page.getByLabel('视觉模型').fill('gpt-4o-mini');
     await page.getByRole('button', { name: '保存到本浏览器' }).click();
     await expect(page.getByRole('status').filter({ hasText: '已保存到本浏览器' })).toBeVisible();
     expect(calls.some(c => c.method === 'PATCH')).toBe(false);
     const saved = await page.evaluate(() => localStorage.getItem('vl-model'));
     expect(JSON.parse(saved!).state.config).toEqual({ provider: 'openai-compatible', baseUrl: 'https://api.deepseek.com/v1', apiKey: 'sk-test-online', model: 'deepseek-chat' });
+    expect(JSON.parse(saved!).state.embedding).toEqual({ baseUrl: 'https://api.deepseek.com/v1', apiKey: 'sk-test-online', model: 'text-embedding-3-small' });
+    expect(JSON.parse(saved!).state.vision).toEqual({ provider: 'openai-compatible', baseUrl: 'https://api.deepseek.com/v1', apiKey: 'sk-test-online', model: 'gpt-4o-mini' });
 
     await page.getByRole('button', { name: '清除 Key' }).click();
     await page.getByRole('dialog').getByRole('button', { name: '清除' }).click();
     await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('vl-model') ?? '{"state":{"config":null}}').state.config)).toBeNull();
+    await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('vl-model') ?? '{"state":{"embedding":null}}').state.embedding)).toBeNull();
+    await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('vl-model') ?? '{"state":{"vision":null}}').state.vision)).toBeNull();
     await expect(page.getByLabel('API Key', { exact: true })).toHaveValue('');
   });
 

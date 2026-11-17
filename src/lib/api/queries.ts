@@ -37,8 +37,14 @@ export type RetrievalIndexStatusView = {
   ready: number;
   failed: number;
   total: number;
+  paragraphCount?: number;
+  charCount?: number;
+  baseUrl?: string | null;
   jobId: string | null;
   usable: boolean;
+  resumable?: boolean;
+  leaseExpired?: boolean;
+  error?: { code: string; message: string; retryable: boolean } | null;
   configured: boolean;
   model: string | null;
 };

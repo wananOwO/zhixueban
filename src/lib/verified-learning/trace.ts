@@ -13,6 +13,7 @@ export interface TraceStep {
   ok: boolean;
   read?: { sourceId: string; chapterId: string; from: number; to: number };
   search?: string;
+  searchStats?: { total: number; keywordCount: number; vectorCount: number; degraded: boolean };
   cites?: { sourceId: string; paragraphIndex: number }[];
   section?: string;
   question?: number;
@@ -96,7 +97,21 @@ function step(call: ToolCall, result: Message | undefined, at: number): TraceSte
   const base: TraceStep = { at, tool: call.name, label: LABELS[call.name] ?? call.name, ok };
   if (!ok) base.error = errorKind(text);
   switch (call.name) {
-    case 'search_sources':
+    case 'search_sources': {
+      base.search = str(args.query, 120);
+      if (ok && text) {
+        try {
+          const parsed = JSON.parse(text) as { total?: unknown; keywordCount?: unknown; vectorCount?: unknown; degraded?: unknown };
+          const total = int(parsed.total);
+          const keywordCount = int(parsed.keywordCount);
+          const vectorCount = int(parsed.vectorCount);
+          if (total !== undefined && keywordCount !== undefined && vectorCount !== undefined) {
+            base.searchStats = { total, keywordCount, vectorCount, degraded: parsed.degraded === true };
+          }
+        } catch { /* 非结构化返回不提取统计 */ }
+      }
+      break;
+    }
     case 'search_web':
       base.search = str(args.query, 120);
       break;

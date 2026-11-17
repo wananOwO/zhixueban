@@ -6,16 +6,29 @@ import { parse } from './backend-contracts';
 const text = z.string().trim().max(300);
 const url = z.string().trim().max(2000).refine(value => {
   if (!value) return true;
-  try { const parsed = new URL(value); return ['http:', 'https:'].includes(parsed.protocol) && !parsed.username && !parsed.password && !parsed.search && !parsed.hash; }
-  catch { return false; }
+  try {
+    const parsed = new URL(value);
+    return ['http:', 'https:'].includes(parsed.protocol) && !parsed.username && !parsed.password && !parsed.search && !parsed.hash;
+  } catch {
+    return false;
+  }
 });
 const secret = z.string().trim().max(4096);
 // 本机 Obsidian vault：只接受绝对路径（笔记写入时再检查是否存在）
 const folder = z.string().trim().max(1000).refine(value => !value || path.isAbsolute(value), '请填写绝对路径');
+
 const schema = z.strictObject({
   llm_provider: z.enum(['openai-compatible', 'anthropic']).nullable().optional(),
-  llm_model: text.nullable().optional(), llm_base_url: url.nullable().optional(), llm_api_key: secret.nullable().optional(),
-  embedding_model: text.nullable().optional(), embedding_base_url: url.nullable().optional(), embedding_api_key: secret.nullable().optional(),
+  llm_model: text.nullable().optional(),
+  llm_base_url: url.nullable().optional(),
+  llm_api_key: secret.nullable().optional(),
+  embedding_model: text.nullable().optional(),
+  embedding_base_url: url.nullable().optional(),
+  embedding_api_key: secret.nullable().optional(),
+  vision_provider: z.enum(['openai-compatible', 'anthropic']).nullable().optional(),
+  vision_model: text.nullable().optional(),
+  vision_base_url: url.nullable().optional(),
+  vision_api_key: secret.nullable().optional(),
   obsidian_vault_path: folder.nullable().optional(),
 });
 const keys = Object.keys(schema.shape);

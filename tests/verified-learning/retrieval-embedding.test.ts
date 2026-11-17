@@ -44,4 +44,19 @@ describe('Embedding 调用层', () => {
     expect(fetchMock).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
   });
+
+  it('按返回项的 index 对齐顺序，并在单请求超时时中止且遮蔽 Key', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      data: [{ index: 1, embedding: [0, 1] }, { index: 0, embedding: [1, 0] }],
+    }), { headers: { 'content-type': 'application/json' } })));
+    const port = createEmbeddingPort(config);
+    expect(await port.embed(['甲', '乙'])).toEqual([[1, 0], [0, 1]]);
+
+    vi.stubGlobal('fetch', vi.fn((_url: unknown, init?: RequestInit) => new Promise((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(new Error(`request aborted for ${config.apiKey}`)));
+    })));
+    const fastTimeout = createEmbeddingPort(config, { timeoutMs: 20 });
+    await expect(fastTimeout.embed(['甲'])).rejects.toSatisfy((err: unknown) => !String(err).includes(config.apiKey));
+    vi.unstubAllGlobals();
+  });
 });
