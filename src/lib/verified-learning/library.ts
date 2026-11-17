@@ -73,14 +73,29 @@ export class LibraryService {
     }
     const jobs=new JobStore(this.db);
     const job=jobs.create(scope,'import',key,{hash,format:ext});
-    if(job.result) return this.get(scope,job.result.id);
+    if(job.result){
+      try {
+        const prior=this.get(scope,job.result.id);
+        if(prior.archived){
+          this.db.prepare('UPDATE vl_books SET archived_at=NULL,revision=revision+1 WHERE scope_id=? AND book_id=? AND archived_at IS NOT NULL').run(scope,prior.bookId);
+          return this.get(scope,prior.bookId);
+        }
+        return prior;
+      } catch(error) {
+        if(!(error instanceof LearningError&&error.code==='NOT_FOUND'))throw error;
+      }
+    }
     if(job.resumable)jobs.resume(scope,job.jobId);
     const lease=jobs.claim(scope,job.jobId);
     if(!lease) throw new AppError('IN_PROGRESS','教材导入正在进行，请查询任务');
     const existing=this.db.prepare('SELECT book_id FROM vl_books WHERE scope_id=? AND file_hash=?').get(scope,hash) as {book_id:string}|undefined;
     if(existing){
-      const book=this.get(scope,existing.book_id);
+      let book=this.get(scope,existing.book_id);
       if(book.status!=='ready') { jobs.finish(scope,job.jobId,lease,'failed',null,{code:'IN_PROGRESS',message:'已有导入尚未完成',retryable:true});throw new AppError('IN_PROGRESS','教材尚未导入完成'); }
+      if(book.archived){
+        this.db.prepare('UPDATE vl_books SET archived_at=NULL,revision=revision+1 WHERE scope_id=? AND book_id=? AND archived_at IS NOT NULL').run(scope,existing.book_id);
+        book=this.get(scope,existing.book_id);
+      }
       jobs.finish(scope,job.jobId,lease,'succeeded',{kind:'book',id:book.bookId},null);return book;
     }
     const id=randomUUID();

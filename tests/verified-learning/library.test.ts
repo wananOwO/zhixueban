@@ -10,6 +10,31 @@ const upload=()=>new File(['# 第一章\n变量和函数。\n# 第二章\n循环
 describe('教材后端',()=>{
  it('真实导入、重复上传复用、原文定位和跨scope隔离',async()=>{const {library}=await setup();const first=await library.importFile('a','k1',upload());const second=await library.importFile('a','k2',upload());expect(second.bookId).toBe(first.bookId);expect(library.list('a')).toHaveLength(1);expect(library.list('b')).toEqual([]);const snapshot=library.source('a',first.bookId);expect(snapshot.chapters.flatMap(c=>c.paragraphs).some(p=>p.text.includes('变量'))).toBe(true);expect(()=>library.get('b',first.bookId)).toThrow(expect.objectContaining({code:'NOT_FOUND'}));});
  it('归档可恢复，未关联教材删除，错误版本拒绝',async()=>{const {library}=await setup();const book=await library.importFile('a','key',upload());expect(()=>library.archive('a',book.bookId,99,true)).toThrow();const archived=library.archive('a',book.bookId,0,true);expect(library.list('a')).toEqual([]);expect(library.list('a','',true)).toHaveLength(1);const active=library.archive('a',book.bookId,archived.revision,false);expect(library.inspectDeletion('a',book.bookId).blocked).toBe(false);await library.deleteBook('a',book.bookId,active.revision,active.title);expect(library.list('a')).toEqual([]);});
+ it('已归档教材再次上传同一文件时自动取消归档回到教材库，彻底删除后可全新重传',async()=>{
+  const {library}=await setup();
+  const first=await library.importFile('a','k-up-1',upload());
+  const archived=library.archive('a',first.bookId,first.revision,true);
+  expect(archived.archived).toBe(true);
+  expect(library.list('a','',false)).toHaveLength(0);
+  expect(library.list('a','',true)).toHaveLength(1);
+
+  const reuploaded=await library.importFile('a','k-up-2',upload());
+  expect(reuploaded.bookId).toBe(first.bookId);
+  expect(reuploaded.archived).toBe(false);
+  expect(reuploaded.revision).toBe(archived.revision+1);
+  expect(library.list('a','',false)).toHaveLength(1);
+  expect(library.list('a','',true)).toHaveLength(0);
+
+  const archivedAgain=library.archive('a',reuploaded.bookId,reuploaded.revision,true);
+  await library.deleteBook('a',archivedAgain.bookId,archivedAgain.revision,archivedAgain.title);
+  expect(library.list('a','',false)).toHaveLength(0);
+  expect(library.list('a','',true)).toHaveLength(0);
+
+  const fresh=await library.importFile('a','k-up-3',upload());
+  expect(fresh.bookId).not.toBe(first.bookId);
+  expect(fresh.archived).toBe(false);
+  expect(library.list('a','',false)).toHaveLength(1);
+ });
  it('有课程引用不允许删除，即使已归档',async()=>{const {db,library}=await setup();const book=await library.importFile('a','key',upload());new VerifiedLearningStore(db).createVersion('a',{textbookId:book.bookId,goal:'学习',outline:[]});const archived=library.archive('a',book.bookId,0,true);expect(library.inspectDeletion('a',book.bookId).blocked).toBe(true);await expect(library.deleteBook('a',book.bookId,archived.revision,archived.title)).rejects.toMatchObject({code:'VALIDATION_FAILED'});expect(library.get('a',book.bookId).archived).toBe(true);});
  it('拒绝不支持格式与相同key不同内容，不改已有教材',async()=>{const {library}=await setup();await library.importFile('a','key',upload());await expect(library.importFile('a','key',new File(['different'],'python.md'))).rejects.toMatchObject({code:'VERSION_CONFLICT'});await expect(library.importFile('a','bad',new File(['x'],'evil.exe'))).rejects.toMatchObject({code:'INVALID_INPUT'});expect(library.list('a')).toHaveLength(1);});
  it('数据库删除失败时保留原文件，用户可重试',async()=>{const db=openTestDb();await migrateVerifiedLearning(db);const root=testDirectory(),library=new LibraryService(db,root);const book=await library.importFile('a','key',upload());const filename=path.join(root,readdirSync(root)[0]);db.exec("CREATE TRIGGER reject_delete BEFORE DELETE ON vl_books BEGIN SELECT RAISE(ABORT,'busy'); END");await expect(library.deleteBook('a',book.bookId,0,book.title)).rejects.toThrow();expect(existsSync(filename)).toBe(true);db.exec('DROP TRIGGER reject_delete');await library.deleteBook('a',book.bookId,0,book.title);expect(existsSync(filename)).toBe(false);});
